@@ -1,0 +1,94 @@
+plugins {
+    java
+    kotlin("jvm") version "1.4.21"
+}
+
+group = "il.ac.technion.cs"
+version = "1.0-SNAPSHOT"
+
+allprojects {
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+}
+
+val graalVersion = "20.3.0"
+val jgraphtVersion = "1.5.0"
+val junitVersion = "5.7.0"
+
+dependencies {
+    implementation(kotlin("stdlib-jdk8"))
+    implementation(kotlin("reflect"))
+    implementation("io.reactivex.rxjava3", "rxjava", "3.0.4")
+    implementation("io.reactivex.rxjava3", "rxkotlin", "3.0.0")
+    implementation("org.graalvm.sdk", "graal-sdk", graalVersion)
+    implementation("org.graalvm.compiler", "compiler", graalVersion)
+    implementation("org.graalvm.tools", "insight", graalVersion)
+    implementation("org.jgrapht", "jgrapht-core", jgraphtVersion)
+    implementation("org.jgrapht", "jgrapht-io", jgraphtVersion)
+    implementation("com.github.spotbugs", "spotbugs-annotations", "4.2.0")
+
+    testImplementation("org.assertj", "assertj-core", "3.16.1")
+    testImplementation("org.junit.jupiter", "junit-jupiter-api", junitVersion)
+    testImplementation("org.junit.jupiter", "junit-jupiter-engine", junitVersion)
+}
+
+val moduleArgs = listOf(
+    "--add-modules", "jdk.internal.vm.ci,jdk.internal.vm.compiler",
+    "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED,jdk.internal.vm.compiler",
+    "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.services=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.runtime=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.api.runtime=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.debug=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.options=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.runtime=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.core.target=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.cfg=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodeinfo=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.phases.tiers=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.phases=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.code=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.core=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.core.phases=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.graphbuilderconf=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.java=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.memory=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.memory.address=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.phases.common=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.java=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.graph.iterators=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.calc=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.spi=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.extended=ALL-UNNAMED"
+)
+
+tasks {
+    compileJava {
+        options.apply {
+            compilerArgs = moduleArgs
+        }
+    }
+    compileTestJava {
+        options.apply {
+            compilerArgs = moduleArgs
+        }
+    }
+
+    compileKotlin {
+        kotlinOptions.jvmTarget = "1.8"
+        kotlinOptions.freeCompilerArgs = listOf("-nowarn")
+    }
+    compileTestKotlin {
+        kotlinOptions.jvmTarget = "1.8"
+        kotlinOptions.freeCompilerArgs = listOf("-nowarn")
+    }
+
+    test {
+        useJUnitPlatform()
+        jvmArgs = moduleArgs
+    }
+}
