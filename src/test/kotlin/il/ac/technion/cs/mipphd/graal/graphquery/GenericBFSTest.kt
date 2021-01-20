@@ -71,11 +71,11 @@ internal class GenericBFSTest {
 
 
     @Test
-    fun `possibleChildrenMatches returns ?? in non-Kleene case`() {
+    fun `possibleChildrenMatches returns something in non-Kleene case`() {
     }
 
     @Test
-    fun `possibleChildrenMatches returns ?? in Kleene case`() {
+    fun `possibleChildrenMatches returns something in Kleene case`() {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphMaker.createMaxGraph()
         val queryReturnKleene = query.edgeSet().stream()
