@@ -24,6 +24,12 @@ public class MethodWrapper {
         return resolvedJavaMethod;
     }
 
+    @NonNull
+    public String getDeclaringClassName() { return resolvedJavaMethod.getDeclaringClass().toJavaName(true); }
+
+    @NonNull
+    public String getName() { return resolvedJavaMethod.getName(); }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

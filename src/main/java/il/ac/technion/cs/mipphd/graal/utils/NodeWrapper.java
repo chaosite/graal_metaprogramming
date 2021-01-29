@@ -37,4 +37,14 @@ public class NodeWrapper {
                 "node=" + node +
                 '}';
     }
+
+    public Boolean isType(String className) {
+        try {
+            Class<?> cls = Class.forName("org.graalvm.compiler.nodes." + className);
+            return cls.isAssignableFrom(this.getNode().getClass());
+        } catch (ClassNotFoundException e) {
+            // TODO: Do nothing instead?
+            throw new RuntimeException("No such class", e);
+        }
+    }
 }

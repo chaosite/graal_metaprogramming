@@ -8,11 +8,15 @@ import org.graalvm.compiler.graph.NodeInterface;
 import org.graalvm.compiler.nodes.ReturnNode;
 import org.graalvm.compiler.nodes.cfg.ControlFlowGraph;
 import org.jetbrains.annotations.Nullable;
+import org.jgrapht.Graph;
 import org.jgrapht.graph.DirectedPseudograph;
 import org.jgrapht.nio.Attribute;
 import org.jgrapht.nio.DefaultAttribute;
+import org.jgrapht.nio.dot.DOTEventDrivenImporter;
 import org.jgrapht.nio.dot.DOTExporter;
+import org.jgrapht.nio.dot.DOTImporter;
 
+import java.io.Reader;
 import java.io.Writer;
 import java.util.*;
 import java.util.function.Predicate;
@@ -81,5 +85,19 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex<? extends N
             return attrs;
         });
         exporter.exportGraph(this, output);
+    }
+
+    static GraphQuery importQuery(Reader input) {
+        GraphQuery ret = new GraphQuery();
+        DOTImporter<GraphQueryVertex<? extends NodeInterface>, GraphQueryEdge> importer = new DOTImporter<>();
+        importer.setVertexFactory(s -> GraphQueryVertexM.fromQuery("1 = 1"));
+        importer.addVertexAttributeConsumer(((p, a) -> {
+            if (p.getSecond().equals("label")) {
+                GraphQueryVertexM v = (GraphQueryVertexM) p.getFirst();
+                v.setMQuery(MQueryKt.parseMQuery(a.getValue()));
+            }
+        }));
+        importer.importGraph(ret, input);
+        return ret;
     }
 }

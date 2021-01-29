@@ -7,16 +7,7 @@ import java.util.function.Predicate;
 
 public class GraphQueryVertex<T extends NodeInterface> {
     private final Class<T> clazz;
-    private final Predicate<NodeInterface> predicate;
-
-    @SuppressWarnings("unchecked")
-    public static <T extends NodeInterface> GraphQueryVertex<?> parse(String clazz) {
-        try {
-            return new GraphQueryVertex<>((Class<T>) Class.forName(clazz), v -> true);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Blahh", e);
-        }
-    }
+    private Predicate<NodeInterface> predicate;
 
     @SuppressWarnings("unchecked")
     public GraphQueryVertex(Class<T> clazz, Predicate<T> predicate) {
@@ -31,6 +22,7 @@ public class GraphQueryVertex<T extends NodeInterface> {
     public Predicate<NodeInterface> getPredicate() {
         return predicate;
     }
+    public void setPredicate(Predicate<? extends NodeInterface> predicate) { this.predicate = (Predicate<NodeInterface>) predicate;}
 
     public boolean match(NodeInterface value) {
         if (this.clazz.isAssignableFrom(value.getClass())) {
@@ -51,7 +43,7 @@ public class GraphQueryVertex<T extends NodeInterface> {
     }
 
     public String label() {
-        return clazz.getCanonicalName();
+        return "is('" + clazz.getCanonicalName().replaceFirst("org[.]graalvm[.]compiler[.]nodes[.]", "") + "')";
     }
 
     /* do not override equals/hashCode! */

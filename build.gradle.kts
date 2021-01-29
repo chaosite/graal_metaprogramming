@@ -8,12 +8,13 @@ version = "1.0-SNAPSHOT"
 
 allprojects {
     repositories {
+
         mavenCentral()
         jcenter()
     }
 }
 
-val graalVersion = "20.3.0"
+val graalVersion = "21.0.0"
 val jgraphtVersion = "1.5.0"
 val junitVersion = "5.7.0"
 
@@ -28,10 +29,13 @@ dependencies {
     implementation("org.jgrapht", "jgrapht-core", jgraphtVersion)
     implementation("org.jgrapht", "jgrapht-io", jgraphtVersion)
     implementation("com.github.spotbugs", "spotbugs-annotations", "4.2.0")
+    implementation("com.github.h0tk3y.betterParse", "better-parse","0.4.1")
 
     testImplementation("org.assertj", "assertj-core", "3.16.1")
     testImplementation("org.junit.jupiter", "junit-jupiter-api", junitVersion)
     testImplementation("org.junit.jupiter", "junit-jupiter-engine", junitVersion)
+    testImplementation("org.amshove.kluent", "kluent", "1.65")
+    testImplementation("io.mockk", "mockk", "1.10.5")
 }
 
 val moduleArgs = listOf(
