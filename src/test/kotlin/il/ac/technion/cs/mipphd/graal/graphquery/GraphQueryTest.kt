@@ -19,13 +19,13 @@ val maximumQueryText = """
       n484969820 [ label="is('PhiNode')" ];
       n1314376406 [ label="is('ValueProxyNode')" ];
       n1744166494 [ label="is('ReturnNode')" ];
-      n2021302077 -> n1948571966 [ label="DATA" ];
-      n1948571966 -> n1689892436 [ label="DATA*" ];
-      n818409230 -> n1689892436 [ label="BOTH" ];
-      n1689892436 -> n484969820 [ label="DATA" ];
-      n484969820 -> n1689892436 [ label="DATA" ];
-      n484969820 -> n1314376406 [ label="DATA" ];
-      n1314376406 -> n1744166494 [ label="DATA*" ];
+      n2021302077 -> n1948571966 [ label="is('DATA')" ];
+      n1948571966 -> n1689892436 [ label="*|is('DATA')" ];
+      n818409230 -> n1689892436 [ label="is('DATA') or is('CONTROL')" ];
+      n1689892436 -> n484969820 [ label="is('DATA')" ];
+      n484969820 -> n1689892436 [ label="is('DATA')" ];
+      n484969820 -> n1314376406 [ label="is('DATA')" ];
+      n1314376406 -> n1744166494 [ label="*|is('DATA')" ];
     }
 """.trimIndent()
 
@@ -39,14 +39,14 @@ internal class GraphQueryTest {
         val cfg = methodToGraph.getCFG(maximum)
         val set = mutableSetOf(*cfg.asCFG().graph.nodes.toList().toTypedArray())
         maximumQuery.vertexSet().forEach { queryNode ->
-            assertTrue(set.any { (queryNode as GraphQueryVertex<NodeInterface>).match(it) }, "Couldn't find $queryNode")
+            assertTrue(set.any { (queryNode as GraphQueryVertex<*>).match(it) }, "Couldn't find $queryNode")
         }
     }
 
     @Test
     fun `maximum query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
-        assertEquals(4, maximumQuery.match(cfg).size)
+        assertEquals(18, maximumQuery.match(cfg).size)
     }
 
     @Test
@@ -91,6 +91,6 @@ internal class GraphQueryTest {
         query.vertexSet().forEach { queryNode ->
             assertTrue(set.any { (queryNode as GraphQueryVertex<NodeInterface>).match(it) }, "Couldn't find $queryNode")
         }
-        assertEquals(4, query.match(cfg).size)
+        assertEquals(18, query.match(cfg).size)
     }
 }

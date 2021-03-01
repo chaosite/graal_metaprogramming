@@ -1,19 +1,33 @@
 package il.ac.technion.cs.mipphd.graal;
 
-import org.graalvm.compiler.nodes.cfg.Block;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import il.ac.technion.cs.mipphd.graal.utils.EdgeWrapper;
+import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter;
+import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 public abstract class DataFlowAnalysis<T> {
-    private final List<Block> nodes;
-    private final List<Block> entryPoints;
-    private final List<Block> exitPoints;
+    @NonNull
+    private final GraalAdapter graph;
+    @NonNull
+    private final List<NodeWrapper> nodes;
+    @NonNull
+    private final List<NodeWrapper> entryPoints;
+    @NonNull
+    private final List<NodeWrapper> exitPoints;
+    @NonNull
     private final Direction direction;
-    protected Map<Block, T> nodeToIn;
-    protected Map<Block, T> nodeToOut;
+    @NonNull
+    protected Map<NodeWrapper, T> nodeToIn;
+    @NonNull
+    protected Map<NodeWrapper, T> nodeToOut;
 
-    public DataFlowAnalysis(Direction direction, List<Block> nodes, List<Block> entryPoints, List<Block> exitPoints) {
+    public DataFlowAnalysis(@NotNull GraalAdapter graph, @NotNull Direction direction, @NotNull List<NodeWrapper> nodes, @NotNull List<NodeWrapper> entryPoints, @NotNull List<NodeWrapper> exitPoints) {
+        super();
+        this.graph = graph;
         this.direction = direction;
         this.nodes = nodes;
         this.entryPoints = entryPoints;
@@ -24,35 +38,35 @@ public abstract class DataFlowAnalysis<T> {
 
     public enum Direction {
         FORWARD,
-        BACKWARD;
+        BACKWARD
     }
 
     protected abstract T newInitial();
 
     protected abstract void copy(T source, T dest);
 
-    protected abstract void flow(T input, Block d, T out);
+    protected abstract void flow(T input, NodeWrapper d, T out);
 
     protected abstract void merge(T in1, T in2, T out);
 
-
-
-    public T getFlowAfter(Block node) {
+    @NonNull
+    public T getFlowAfter(@NonNull NodeWrapper node) {
         return nodeToOut.get(node);
     }
 
-    public T getFlowBefore(Block node) {
+    @NonNull
+    public T getFlowBefore(@NonNull NodeWrapper node) {
         return nodeToIn.get(node);
     }
 
     public void doAnalysis() {
         for (int iteration = 0; ; iteration++) {
-            List<Block> workingSet = getStartSet();
+            List<NodeWrapper> workingSet = getStartSet();
             boolean changed = false;
-            HashSet<Block> visited = new HashSet<>();
+            HashSet<NodeWrapper> visited = new HashSet<>();
             while (!workingSet.isEmpty()) {
-                final ArrayList<Block> nextSet = new ArrayList<>();
-                for (Block w : workingSet) {
+                final ArrayList<NodeWrapper> nextSet = new ArrayList<>();
+                for (NodeWrapper w : workingSet) {
                     T before = nodeToOut.getOrDefault(w, newInitial());
                     T after = newInitial();
                     flow(mergePredecessors(w), w, after);
@@ -61,7 +75,7 @@ public abstract class DataFlowAnalysis<T> {
                     visited.add(w);
                 }
 
-                for (Block w : workingSet) {
+                for (NodeWrapper w : workingSet) {
                     nextSet.addAll(getLater(w).stream().filter(n -> !visited.contains(n)).collect(Collectors.toList()));
                 }
                 workingSet = nextSet;
@@ -72,7 +86,8 @@ public abstract class DataFlowAnalysis<T> {
         }
     }
 
-    private T mergePredecessors(Block node) {
+    @NonNull
+    private T mergePredecessors(@NonNull NodeWrapper node) {
         return getEarlier(node).stream()
                 .map(p -> nodeToOut.getOrDefault(p, newInitial()))
                 .reduce(newInitial(), (p, q) -> {
@@ -82,7 +97,8 @@ public abstract class DataFlowAnalysis<T> {
                 });
     }
 
-    private List<Block> getStartSet() {
+    @NonNull
+    private List<NodeWrapper> getStartSet() {
         switch (direction) {
             case FORWARD:
                 return entryPoints;
@@ -92,22 +108,28 @@ public abstract class DataFlowAnalysis<T> {
         throw new RuntimeException();
     }
 
-    private List<Block> getEarlier(Block node) {
+    private boolean controlEdgePredicate(@NonNull EdgeWrapper edge) {
+        return edge.getLabel().equals(EdgeWrapper.CONTROL);
+    }
+
+    @NonNull
+    private List<NodeWrapper> getEarlier(@NonNull NodeWrapper node) {
         switch (direction) {
             case FORWARD:
-                return Arrays.asList(node.getPredecessors());
+                return graph.incomingEdgesOf(node).stream().filter(this::controlEdgePredicate).map(graph::getEdgeSource).collect(Collectors.toList());
             case BACKWARD:
-                return Arrays.asList(node.getSuccessors());
+                return graph.outgoingEdgesOf(node).stream().filter(this::controlEdgePredicate).map(graph::getEdgeTarget).collect(Collectors.toList());
         }
         throw new RuntimeException();
     }
 
-    private List<Block> getLater(Block node) {
+    @NonNull
+    private List<NodeWrapper> getLater(@NonNull NodeWrapper node) {
         switch (direction) {
             case FORWARD:
-                return Arrays.asList(node.getSuccessors());
+                return graph.outgoingEdgesOf(node).stream().filter(this::controlEdgePredicate).map(graph::getEdgeTarget).collect(Collectors.toList());
             case BACKWARD:
-                return Arrays.asList(node.getPredecessors());
+                return graph.incomingEdgesOf(node).stream().filter(this::controlEdgePredicate).map(graph::getEdgeSource).collect(Collectors.toList());
         }
         throw new RuntimeException();
     }

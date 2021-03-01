@@ -5,7 +5,8 @@ import java.util.Set;
 public enum GraphQueryEdgeType {
     DATA_FLOW(Set.of("DATA")),
     CONTROL_FLOW(Set.of("CONTROL")),
-    BOTH(Set.of("DATA", "CONTROL"));
+    DATA_OR_CONTROL(Set.of("DATA", "CONTROL")),
+    ASSOCIATED(Set.of("ASSOCIATED"));
 
     private final Set<String> matching;
 

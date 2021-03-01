@@ -1,6 +1,6 @@
 plugins {
     java
-    kotlin("jvm") version "1.4.21"
+    kotlin("jvm") version "1.4.30"
 }
 
 group = "il.ac.technion.cs"
@@ -8,7 +8,6 @@ version = "1.0-SNAPSHOT"
 
 allprojects {
     repositories {
-
         mavenCentral()
         jcenter()
     }
@@ -31,11 +30,19 @@ dependencies {
     implementation("com.github.spotbugs", "spotbugs-annotations", "4.2.0")
     implementation("com.github.h0tk3y.betterParse", "better-parse","0.4.1")
 
+    // Elina
+    implementation(files("libs/gmp.jar", "libs/apron.jar"))
+    implementation(files("libs/gmp.jar"))
+    implementation(files("libs/apron.jar", "libs/gmp.jar", "libs/elina.jar"))
+    //implementation(files("libs/gmp.jar", "libs/apron.jar", "libs/elina.jar"))
+    // runtimeOnly(files("libs/gmp.jar", "libs/apron.jar", "libs/elina.jar"))
+
     testImplementation("org.assertj", "assertj-core", "3.16.1")
     testImplementation("org.junit.jupiter", "junit-jupiter-api", junitVersion)
     testImplementation("org.junit.jupiter", "junit-jupiter-engine", junitVersion)
     testImplementation("org.amshove.kluent", "kluent", "1.65")
     testImplementation("io.mockk", "mockk", "1.10.5")
+    testImplementation("com.tylerthrailkill.helpers:pretty-print:v2.0.8")
 }
 
 val moduleArgs = listOf(
@@ -94,5 +101,7 @@ tasks {
     test {
         useJUnitPlatform()
         jvmArgs = moduleArgs
+        maxHeapSize = "8g"
+        systemProperty("java.library.path", "/usr/local/lib")
     }
 }

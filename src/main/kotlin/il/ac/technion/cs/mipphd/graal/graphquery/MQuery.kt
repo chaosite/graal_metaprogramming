@@ -7,158 +7,181 @@ import com.github.h0tk3y.betterParse.grammar.parser
 import com.github.h0tk3y.betterParse.lexer.literalToken
 import com.github.h0tk3y.betterParse.lexer.regexToken
 import com.github.h0tk3y.betterParse.parser.Parser
+import com.github.h0tk3y.betterParse.utils.Tuple2
+import il.ac.technion.cs.mipphd.graal.utils.EdgeWrapper
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 
+sealed class QueryTarget
+data class QueryTargetNode(val node: NodeWrapper) : QueryTarget()
+data class QueryTargetEdge(val source: NodeWrapper, val edge: EdgeWrapper) : QueryTarget()
 
 sealed class MQuery {
-    fun interpret(node: NodeWrapper): Boolean {
-        typecheck(node) || return false // TODO: Do this during parse
-        val value = value(node)
+    fun interpret(target: QueryTarget): Boolean {
+        typecheck(target) || return false // TODO: Do this during parse
+        val value = value(target)
         if (value !is BooleanValue)
             throw RuntimeException("?!?")
         return value.value
     }
 
-    abstract fun typecheck(node: NodeWrapper): Boolean
-    abstract fun type(node: NodeWrapper): MType
-    abstract fun value(node: NodeWrapper): MValue
+    abstract fun typecheck(target: QueryTarget): Boolean
+    abstract fun type(target: QueryTarget): MType
+    abstract fun value(target: QueryTarget): MValue
     abstract fun serialize(): String
 }
 
 sealed class MValue : MQuery() {
     abstract val value: Any
-    override fun typecheck(node: NodeWrapper) = true
-    override fun value(node: NodeWrapper) = this
+    override fun typecheck(target: QueryTarget) = true
+    override fun value(target: QueryTarget) = this
 }
 
 data class Variable(val name: String) : MQuery() {
-    override fun type(node: NodeWrapper) = predefinedVariable.type
-    override fun value(node: NodeWrapper) = predefinedVariable.contents
-    override fun typecheck(node: NodeWrapper) = true
+    override fun type(target: QueryTarget) = predefinedVariable.type
+    override fun value(target: QueryTarget) = predefinedVariable.contents
+    override fun typecheck(target: QueryTarget) = true
     override fun serialize() = name
 
     private val predefinedVariable get() = predefined.getValue(name)
 }
 
 data class BooleanValue(override val value: Boolean) : MValue() {
-    override fun type(node: NodeWrapper) = MBoolean
+    override fun type(target: QueryTarget) = MBoolean
     override fun serialize() = value.toString()
 }
 
 data class StringValue(override val value: String) : MValue() {
-    override fun type(node: NodeWrapper) = MString
-    override fun serialize() = """"$value""""
+    override fun type(target: QueryTarget) = MString
+    override fun serialize() = """'$value'"""
 }
 
 data class IntegerValue(override val value: Long) : MValue() {
-    override fun type(node: NodeWrapper) = MInteger
+    override fun type(target: QueryTarget) = MInteger
     override fun serialize() = value.toString()
 }
 
 data class StructValue(override val value: Map<String, MValue>) : MValue() {
-    override fun type(node: NodeWrapper): MType = MStruct(value.mapValues { it.value.type(node) })
+    override fun type(target: QueryTarget): MType = MStruct(value.mapValues { it.value.type(target) })
     override fun serialize() = TODO("Not implemented")
 }
 
-data class FunctionValue(val type: MType, override val value: (List<MQuery>, NodeWrapper) -> MValue) : MValue() {
-    override fun type(node: NodeWrapper) = type
+data class FunctionValue(val type: MType, override val value: (List<MQuery>, QueryTarget) -> MValue) : MValue() {
+    override fun type(target: QueryTarget) = type
     override fun serialize() = TODO("Not implemented")
 }
 
 data class Equals(val lvalue: MQuery, val rvalue: MQuery) : MQuery() {
-    override fun type(node: NodeWrapper) = MBoolean
-    override fun typecheck(node: NodeWrapper) = lvalue.typecheck(node) &&
-            rvalue.typecheck(node) &&
-            lvalue.type(node).match(rvalue.type(node))
+    override fun type(target: QueryTarget) = MBoolean
+    override fun typecheck(target: QueryTarget) = lvalue.typecheck(target) &&
+            rvalue.typecheck(target) &&
+            lvalue.type(target).match(rvalue.type(target))
 
-    override fun value(node: NodeWrapper): MValue {
-        return BooleanValue(lvalue.value(node) == rvalue.value(node))
+    override fun value(target: QueryTarget): MValue {
+        return BooleanValue(lvalue.value(target) == rvalue.value(target))
     }
 
     override fun serialize() = "(${lvalue.serialize()}) = (${rvalue.serialize()})"
 }
 
 data class And(val left: MQuery, val right: MQuery) : MQuery() {
-    override fun type(node: NodeWrapper) = MBoolean
-    override fun typecheck(node: NodeWrapper) = left.typecheck(node) &&
-            right.typecheck(node) &&
-            left.type(node).match(MBoolean) &&
-            right.type(node).match(MBoolean)
+    override fun type(target: QueryTarget) = MBoolean
+    override fun typecheck(target: QueryTarget) = left.typecheck(target) &&
+            right.typecheck(target) &&
+            left.type(target).match(MBoolean) &&
+            right.type(target).match(MBoolean)
 
-    override fun value(node: NodeWrapper): MValue {
-        return BooleanValue(left.value(node).value as Boolean && right.value(node).value as Boolean)
+    override fun value(target: QueryTarget): MValue {
+        return BooleanValue(left.value(target).value as Boolean && right.value(target).value as Boolean)
     }
 
     override fun serialize() = "(${left.serialize()}) and (${right.serialize()})"
 }
 
 data class Or(val left: MQuery, val right: MQuery) : MQuery() {
-    override fun type(node: NodeWrapper) = MBoolean
-    override fun typecheck(node: NodeWrapper) = left.typecheck(node) &&
-            right.typecheck(node) &&
-            left.type(node).match(MBoolean) &&
-            right.type(node).match(MBoolean)
+    override fun type(target: QueryTarget) = MBoolean
+    override fun typecheck(target: QueryTarget) = left.typecheck(target) &&
+            right.typecheck(target) &&
+            left.type(target).match(MBoolean) &&
+            right.type(target).match(MBoolean)
 
-    override fun value(node: NodeWrapper) = BooleanValue(
-        left.value(node).value as Boolean && right.value(node).value as Boolean
+    override fun value(target: QueryTarget) = BooleanValue(
+        left.value(target).value as Boolean || right.value(target).value as Boolean
     )
 
     override fun serialize() = "(${left.serialize()}) or (${right.serialize()})"
 }
 
 data class Not(val query: MQuery) : MQuery() {
-    override fun type(node: NodeWrapper) = MBoolean
-    override fun typecheck(node: NodeWrapper) = query.typecheck(node) &&
-            query.type(node).match(MBoolean)
+    override fun type(target: QueryTarget) = MBoolean
+    override fun typecheck(target: QueryTarget) = query.typecheck(target) &&
+            query.type(target).match(MBoolean)
 
-    override fun value(node: NodeWrapper) = BooleanValue(!(query.value(node).value as Boolean))
+    override fun value(target: QueryTarget) = BooleanValue(!(query.value(target).value as Boolean))
 
     override fun serialize() = "not (${query.serialize()})"
 }
 
-data class FuncCall(val func: MQuery, val parameters: List<MQuery>) : MQuery() {
-    override fun typecheck(node: NodeWrapper): Boolean {
-        val funcType = func.type(node)
-        return parameters.all { it.typecheck(node) } &&
-                funcType is MFunction &&
-                parameters.size == funcType.parameters.size &&
-                funcType.parameters.zip(parameters).all { (t, q) -> t.match(q.type(node)) }
+sealed class MetadataOption {
+    object Kleene : MetadataOption() {
+        override fun serialize() = "*"
+    }
+    data class CaptureName(val name: String) : MetadataOption() {
+        override fun serialize() = "(?P<$name>)"
     }
 
-    override fun type(node: NodeWrapper) = (func.type(node) as MFunction).returnType
+    abstract fun serialize(): String
+}
 
-    override fun value(node: NodeWrapper) = (func.value(node) as FunctionValue).value(parameters, node)
+data class Metadata(val query: MQuery, val options: List<MetadataOption> = listOf()) : MQuery() {
+    override fun type(target: QueryTarget) = query.type(target)
+    override fun typecheck(target: QueryTarget) = query.typecheck(target)
+    override fun value(target: QueryTarget) = query.value(target)
+    override fun serialize() = (if (options.isNotEmpty()) "${options.joinToString { it.serialize() }}|" else "") + query.serialize()
+}
 
-    override fun serialize() = "(${func.serialize()})(${parameters.joinToString(",", transform = MQuery::serialize)})"
+data class FuncCall(val func: MQuery, val parameters: List<MQuery>) : MQuery() {
+    override fun typecheck(target: QueryTarget): Boolean {
+        val funcType = func.type(target)
+        return parameters.all { it.typecheck(target) } &&
+                funcType is MFunction &&
+                parameters.size == funcType.parameters.size &&
+                funcType.parameters.zip(parameters).all { (t, q) -> t.match(q.type(target)) }
+    }
+
+    override fun type(target: QueryTarget) = (func.type(target) as MFunction).returnType
+
+    override fun value(target: QueryTarget) = (func.value(target) as FunctionValue).value(parameters, target)
+
+    override fun serialize() = "${func.serialize()}(${parameters.joinToString(",", transform = MQuery::serialize)})"
 }
 
 data class Access(val base: MQuery, val accessor: MQuery) : MQuery() {
-    override fun typecheck(node: NodeWrapper): Boolean {
-        val baseType = base.type(node)
-        return base.typecheck(node) &&
-                accessor.typecheck(node) &&
+    override fun typecheck(target: QueryTarget): Boolean {
+        val baseType = base.type(target)
+        return base.typecheck(target) &&
+                accessor.typecheck(target) &&
                 baseType is MStruct &&
                 accessor is Variable &&
                 accessor.name in baseType.contents
     }
 
-    override fun type(node: NodeWrapper): MType {
-        val baseType = base.type(node)
+    override fun type(target: QueryTarget): MType {
+        val baseType = base.type(target)
         if (baseType !is MStruct || accessor !is Variable) {
             throw RuntimeException("Type error, b: $base r: $accessor")
         }
         return baseType.contents.getValue(accessor.name)
     }
 
-    override fun value(node: NodeWrapper): MValue {
-        val baseValue = base.value(node)
+    override fun value(target: QueryTarget): MValue {
+        val baseValue = base.value(target)
         if (baseValue !is StructValue || accessor !is Variable) {
             throw java.lang.RuntimeException("Type error, b: $base r: $accessor")
         }
         return baseValue.value.getValue(accessor.name)
     }
 
-    override fun serialize() = "(${base.serialize()}).(${accessor.serialize()})"
+    override fun serialize() = "(${base.serialize()}.${accessor.serialize()})"
 }
 
 val mGrammar = object : Grammar<MQuery>() {
@@ -173,12 +196,17 @@ val mGrammar = object : Grammar<MQuery>() {
     val or by literalToken("or")
     val eq by literalToken("=")
     val id by regexToken("""\w+""")
-    val ws by regexToken("""\s+""", ignore = true)
+    val kleeneStar by literalToken("*")
+    val pipe by literalToken("|")
+    val question by literalToken("?")
+    val langle by literalToken("<")
+    val rangle by literalToken(">")
+    val _ws by regexToken("""\s+""", ignore = true)
 
     val negation by -not * parser(this::value) map { Not(it) }
     val parenExpression by -lpar * parser(this::orChain) * -rpar
     val literal: Parser<MQuery> by (
-            id map { Variable(it.text)}) or
+            id map { Variable(it.text) }) or
             (int map { IntegerValue(it.text.toLong()) }) or
             (str map { StringValue(it.text.removeSurrounding("\"").removeSurrounding("'")) }) or
             negation or
@@ -200,13 +228,26 @@ val mGrammar = object : Grammar<MQuery>() {
                     outer.t2?.invoke(f) ?: f
                 }
             }) or
-            (-eq * parser(this::value) map { outer -> { inner -> Equals(inner, outer)}})
-    val value: Parser<MQuery> by negation or parenExpression or nonLeftRecursive or literal
+            (-eq * parser(this::value) map { outer -> { inner -> Equals(inner, outer) } })
+    val value: Parser<MQuery> by negation or nonLeftRecursive or literal
 
     val andChain by leftAssociative(value, and) { l, _, r -> And(l, r) }
     val orChain by leftAssociative(andChain, or) { l, _, r -> Or(l, r) }
 
-    override val rootParser by orChain
+    val option: Parser<MetadataOption> by (
+            kleeneStar asJust MetadataOption.Kleene) or
+            ((-lpar * -question * id * -langle * id * -rangle * -rpar) map {
+                when (it.t1.text) {
+                    "P" -> MetadataOption.CaptureName(it.t2.text)
+                    else -> throw RuntimeException("Unexpected option character '${it.t1.text}'")
+                } }
+            )
+
+    val metadata: Parser<MQuery> by (
+            oneOrMore(option) * -pipe * orChain map { Metadata(it.t2, it.t1) }) or
+            (orChain map { Metadata(it) })
+
+    override val rootParser by metadata
 }
 
 fun parseMQuery(input: String): MQuery = mGrammar.parseToEnd(input)

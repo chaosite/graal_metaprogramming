@@ -1,6 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
-import il.ac.technion.cs.mipphd.graal.GraalAdapter
+import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.Listable
 import il.ac.technion.cs.mipphd.graal.MethodToGraph
 import org.graalvm.compiler.nodes.ValuePhiNode
@@ -11,8 +11,8 @@ import kotlin.reflect.jvm.javaMethod
 import kotlin.streams.toList
 
 internal class GenericBFSTest {
-    val methodToGraph = MethodToGraph()
-    val maximum = Listable::maximum.javaMethod
+    private val methodToGraph = MethodToGraph()
+    private val maximum = Listable::maximum.javaMethod
 
     @Test
     fun `maximum query matches maximum function ir`() {
@@ -22,7 +22,7 @@ internal class GenericBFSTest {
 
         val results = bfsMatch(query, GraalAdapter.fromGraal(cfg), vertex)
 
-        assertEquals(4, results.size)
+        assertEquals(18, results.size)
     }
 
     @Test
@@ -44,7 +44,7 @@ internal class GenericBFSTest {
 
         val results = bfsMatch(query, GraalAdapter.fromGraal(cfg), vertex)
 
-        assertEquals(6, results.size)
+        assertEquals(22, results.size)
     }
 
     @Test

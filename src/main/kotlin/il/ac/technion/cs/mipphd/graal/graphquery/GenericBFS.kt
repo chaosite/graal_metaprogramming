@@ -1,6 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
-import il.ac.technion.cs.mipphd.graal.GraalAdapter
+import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import org.graalvm.compiler.graph.NodeInterface
 import org.jgrapht.Graph
@@ -12,19 +12,20 @@ enum class Direction {
 }
 
 fun possibleChildrenMatches(query: GraphQuery, graph: GraalAdapter, queryV: GraphQueryVertex<*>, graphV: NodeWrapper):
-        List<Map<GraphQueryVertex<out NodeInterface>, List<NodeWrapper>>> = listOf(query.edgesOf(queryV).map { qe ->
-    val dir = if (query.getEdgeSource(qe) == queryV) Direction.FORWARDS else Direction.BACKWARDS
-    val queryW = directionToEdgeFunction(query, dir)(qe)
-    if (qe.matchType == GraphQueryEdgeMatchType.KLEENE && dir == Direction.BACKWARDS)
-        null // Not handling backwards Kleene edges.
-    else
-    Pair(queryW, (
-            if (qe.matchType == GraphQueryEdgeMatchType.KLEENE)
-                kleeneTransitiveClosure(graph, queryV, qe, graphV, dir)
-                    .flatMap { singleStep(graph, queryV, qe, it, dir) } // ??
-            else singleStep(graph, queryV, qe, graphV, dir)
-            ).filter(queryW::match))
-}.filterNotNull().toMap())
+        List<Map<GraphQueryVertex<out NodeInterface>, List<List<NodeWrapper>>>> =
+    listOf(query.edgesOf(queryV).mapNotNull { qe ->
+        val dir = if (query.getEdgeSource(qe) == queryV) Direction.FORWARDS else Direction.BACKWARDS
+        val queryW = directionToEdgeFunction(query, dir)(qe)
+        if (qe.matchType == GraphQueryEdgeMatchType.KLEENE && dir == Direction.BACKWARDS)
+            null // Not handling backwards Kleene edges.
+        else
+            Pair(queryW, (
+                    if (qe.matchType == GraphQueryEdgeMatchType.KLEENE)
+                        kleeneTransitiveClosure(graph, queryV, qe, graphV, dir)
+                            .flatMap { path -> singleStep(graph, queryV, qe, path.last(), dir).map { path + it } } // ??
+                    else singleStep(graph, queryV, qe, graphV, dir)
+                    ).filter { queryW.match(it.last()) })
+    }.toMap())
 
 fun singleStep(
     graph: GraalAdapter,
@@ -32,9 +33,9 @@ fun singleStep(
     queryE: GraphQueryEdge,
     graphV: NodeWrapper,
     dir: Direction,
-): List<NodeWrapper> = directionToEdgesOfFunction(graph, dir)(graphV)
-    .filter { e -> queryE.type.match(e.label) }
-    .map(directionToEdgeFunction(graph, dir))
+): List<List<NodeWrapper>> = directionToEdgesOfFunction(graph, dir)(graphV)
+    .filter { e -> queryE.match(graph.getEdgeSource(e), e) }
+    .map(directionToEdgeFunction(graph, dir)).map(::listOf)
 
 private fun <V, E> directionToEdgesOfFunction(graph: Graph<V, E>, dir: Direction) = when (dir) {
     Direction.FORWARDS -> graph::outgoingEdgesOf
@@ -53,30 +54,36 @@ fun kleeneTransitiveClosure(
     graphStart: NodeWrapper,
     dir: Direction,
 ):
-        List<NodeWrapper> {
+        List<List<NodeWrapper>> {
     assert(dir == Direction.FORWARDS) // TODO: Handle backwards Kleene?
-    val queue = ArrayDeque<NodeWrapper>()
-    queue.add(graphStart)
+    val queue = ArrayDeque<List<NodeWrapper>>()
+    queue.add(listOf(graphStart))
     val visited = mutableSetOf<NodeWrapper>()
+    val ret = mutableListOf(listOf(graphStart))
 
     while (!queue.isEmpty()) {
-        val graphV = queue.removeFirst()
+        val path = queue.removeFirst()
+        val graphV = path.last()
         visited.add(graphV)
-        graph.outgoingEdgesOf(graphV)
-            .filter { e -> queryE.type.match(e.label) }
+        val newPaths = graph.outgoingEdgesOf(graphV)
+            .asSequence()
+            .filter { e -> queryE.match(graphV, e) }
             .map(graph::getEdgeTarget)
             .filter(queryV::match)
-            .filterNot(visited::contains)
-            .forEach(queue::add)
+            .filterNot(path::contains)
+            .map(path::plus)
+            .toList()
+        newPaths.forEach(queue::add)
+        newPaths.forEach(ret::add)
     }
-    return visited.toList()
+    return ret
 }
 
-fun permutations(options: Map<GraphQueryVertex<*>, List<NodeWrapper>>): List<Map<GraphQueryVertex<*>, NodeWrapper>> {
+fun permutations(options: Map<GraphQueryVertex<*>, List<List<NodeWrapper>>>): List<Map<GraphQueryVertex<*>, List<NodeWrapper>>> {
     if (options.isEmpty())
         return listOf(mapOf())
     val queryVertices = options.keys.toList()
-    val sets = queryVertices.map(options::getValue).map(Iterable<NodeWrapper>::toSet)
+    val sets = queryVertices.map(options::getValue).map(Iterable<List<NodeWrapper>>::toSet)
     if (queryVertices.size <= 1) {
         return sets[0].map { mapOf(Pair(queryVertices[0], it)) }
     }
@@ -96,15 +103,15 @@ fun bfsMatch(
     query: GraphQuery,
     graph: GraalAdapter,
     queryStart: GraphQueryVertex<*>,
-): List<Map<GraphQueryVertex<*>, NodeWrapper>> {
+): List<Map<GraphQueryVertex<*>, List<NodeWrapper>>> {
     if (!GraphTests.isConnected(query))
         throw RuntimeException("Query is not weakly-connected - this is an error.")
     return graph.vertexSet().filter(queryStart::match).flatMap { bfsMatch(query, graph, queryStart, it) }
 }
 
 data class WorkItem(
-    val matches: Map<GraphQueryVertex<*>, NodeWrapper>,
-    val queue: List<Pair<GraphQueryVertex<*>, NodeWrapper>>,
+    val matches: Map<GraphQueryVertex<*>, List<NodeWrapper>>,
+    val queue: List<Pair<GraphQueryVertex<*>, List<NodeWrapper>>>,
 )
 
 fun bfsMatch(
@@ -112,31 +119,41 @@ fun bfsMatch(
     graph: GraalAdapter,
     queryStart: GraphQueryVertex<*>,
     graphStart: NodeWrapper,
-): List<Map<GraphQueryVertex<*>, NodeWrapper>> {
+): List<Map<GraphQueryVertex<*>, List<NodeWrapper>>> {
     val workset = ArrayDeque<WorkItem>()
     possibleChildrenMatches(query, graph, queryStart, graphStart).map(::permutations).forEach { options ->
-        options.forEach { workset.add(WorkItem(mapOf(Pair(queryStart, graphStart)), it.toList())) }
+        options.forEach { workset.add(WorkItem(mapOf(Pair(queryStart, listOf(graphStart))), it.toList())) }
     }
-    val fullMatches = mutableListOf<Map<GraphQueryVertex<*>, NodeWrapper>>()
+    val fullMatches = mutableListOf<Map<GraphQueryVertex<*>, List<NodeWrapper>>>()
+
+    var maxMatches : Map<GraphQueryVertex<*>, List<NodeWrapper>> = mapOf()
 
     while (!workset.isEmpty()) {
         val (matches, queue) = workset.removeFirst()
+
+        if (matches.size > maxMatches.size)
+            maxMatches = matches
+
         if (queue.isEmpty()) {
             assert(matches.size == query.vertexSet().size)
             fullMatches.add(matches)
             continue
         } else {
-            assert(matches.size < query.vertexSet().size)
+            //assert(matches.size < query.vertexSet().size)
         }
         val (qV, gV) = queue.first()
         val newMatches = matches.plus(queue.first())
         val newQueue = queue.drop(1)
-        val childrenMatches = possibleChildrenMatches(query, graph, qV, gV).map(::permutations)
+        val childrenMatches = possibleChildrenMatches(query, graph, qV, gV.last()).map(::permutations)
         childrenMatches.forEach { options ->
             options.forEach { childrenMatch ->
-                if (childrenMatch.filter { newMatches.containsKey(it.key) }.all { newMatches[it.key] == it.value })
-                    workset.add(WorkItem(newMatches,
-                        newQueue.plus(childrenMatch.filterNot { newMatches.containsKey(it.key) }.toList())))
+                if (childrenMatch.filter { newMatches.containsKey(it.key) }.all { newMatches.getValue(it.key).last() == it.value.last() })
+                    workset.add(
+                        WorkItem(
+                            newMatches,
+                            newQueue.plus(childrenMatch.filterNot { newMatches.containsKey(it.key) }.toList())
+                        )
+                    )
             }
         }
     }

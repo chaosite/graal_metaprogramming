@@ -4,6 +4,8 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.graalvm.compiler.graph.NodeInterface;
 
+import java.util.List;
+
 public class NodeWrapper {
     private final NodeInterface node;
 
@@ -46,5 +48,9 @@ public class NodeWrapper {
             // TODO: Do nothing instead?
             throw new RuntimeException("No such class", e);
         }
+    }
+
+    public int getId() {
+        return this.node.asNode().getId();
     }
 }

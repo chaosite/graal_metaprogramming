@@ -3,6 +3,7 @@ package il.ac.technion.cs.mipphd.graal.graphquery;
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper;
 import org.graalvm.compiler.graph.NodeInterface;
 
+import java.util.Optional;
 import java.util.function.Predicate;
 
 public class GraphQueryVertex<T extends NodeInterface> {
@@ -19,10 +20,10 @@ public class GraphQueryVertex<T extends NodeInterface> {
         return clazz;
     }
 
-    public Predicate<NodeInterface> getPredicate() {
-        return predicate;
+    @SuppressWarnings("unchecked")
+    public void setPredicate(Predicate<? extends NodeInterface> predicate) {
+        this.predicate = (Predicate<NodeInterface>) predicate;
     }
-    public void setPredicate(Predicate<? extends NodeInterface> predicate) { this.predicate = (Predicate<NodeInterface>) predicate;}
 
     public boolean match(NodeInterface value) {
         if (this.clazz.isAssignableFrom(value.getClass())) {
@@ -44,6 +45,10 @@ public class GraphQueryVertex<T extends NodeInterface> {
 
     public String label() {
         return "is('" + clazz.getCanonicalName().replaceFirst("org[.]graalvm[.]compiler[.]nodes[.]", "") + "')";
+    }
+
+    public Optional<String> captureGroup() {
+        return Optional.empty();
     }
 
     /* do not override equals/hashCode! */

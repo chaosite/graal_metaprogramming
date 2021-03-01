@@ -1,25 +1,19 @@
 package il.ac.technion.cs.mipphd.graal;
 
-import jdk.vm.ci.meta.ResolvedJavaMethod;
+import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter;
+import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper;
 import org.graalvm.compiler.graph.Node;
-import org.graalvm.compiler.nodes.ConstantNode;
 import org.graalvm.compiler.nodes.Invoke;
-import org.graalvm.compiler.nodes.ReturnNode;
 import org.graalvm.compiler.nodes.ValuePhiNode;
-import org.graalvm.compiler.nodes.calc.ConditionalNode;
-import org.graalvm.compiler.nodes.cfg.Block;
-import org.graalvm.compiler.nodes.java.LoadFieldNode;
 import org.graalvm.compiler.nodes.spi.Proxy;
 
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 public class IndexAnalysis extends BackwardsAnalysis<HashSet<Node>> {
-    private List<Invoke> results = new ArrayList<>();
+    private final List<Invoke> results = new ArrayList<>();
 
-    public IndexAnalysis(List<Block> nodes, List<Block> entryPoints, List<Block> exitPoints) {
-        super(nodes, entryPoints, exitPoints);
+    public IndexAnalysis(GraalAdapter graph, List<NodeWrapper> nodes, List<NodeWrapper> entryPoints, List<NodeWrapper> exitPoints) {
+        super(graph, nodes, entryPoints, exitPoints);
     }
 
     public List<Invoke> getResults() {
@@ -45,9 +39,9 @@ public class IndexAnalysis extends BackwardsAnalysis<HashSet<Node>> {
     }
 
     @Override
-    protected void flow(HashSet<Node> input, Block d, HashSet<Node> out) {
-        out.addAll(input);
-        List<Node> nodes = StreamSupport.stream(d.getNodes().spliterator(), false).collect(Collectors.toList());
+    protected void flow(HashSet<Node> input, NodeWrapper d, HashSet<Node> out) {
+       /* out.addAll(input);
+        List<Node> nodes = StreamSupport.stream(d.getNode().asNode().getNodes().spliterator(), false).collect(Collectors.toList());
         Collections.reverse(nodes);
         for (Node n : nodes) {
             if (n instanceof ReturnNode) {
@@ -68,12 +62,12 @@ public class IndexAnalysis extends BackwardsAnalysis<HashSet<Node>> {
                     }
                     System.out.println(out);
                 } else if (n instanceof LoadFieldNode) {
-                    /* ?? */
+                    *//* ?? *//*
                 } else {
                     System.out.println("Unhandled type: " + n.getClass().getName());
                 }
             }
-        }
+        }*/
     }
 
     private Collection<Node> derefProxies(Node node) {
