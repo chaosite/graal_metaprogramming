@@ -42,7 +42,7 @@ internal class DomainsTest {
 
             val results = executor.iterateUntilFixedPoint()
 
-            println(executor.merge(results))
+            println(results)
         }
 
         @Disabled
@@ -51,10 +51,10 @@ internal class DomainsTest {
             val cfg = methodToGraph.getCFG(mccarthy91Method)
             val adapted = GraalAdapter.fromGraal(cfg)
             val analysis = object : ForwardsAnalysis<MutableSet<Int>>(
-                    adapted,
-                    adapted.vertexSet().toList(),
-                    adapted.vertexSet().filter { GraphQueryVertexM.fromQuery("is('StartNode')").match(it) },
-                    adapted.vertexSet().filter { GraphQueryVertexM.fromQuery("is('ReturnNode')").match(it) }) {
+                adapted,
+                adapted.vertexSet().toList(),
+                adapted.vertexSet().filter { GraphQueryVertexM.fromQuery("is('StartNode')").match(it) },
+                adapted.vertexSet().filter { GraphQueryVertexM.fromQuery("is('ReturnNode')").match(it) }) {
                 override fun newInitial(): MutableSet<Int> = mutableSetOf()
 
                 override fun copy(source: MutableSet<Int>, dest: MutableSet<Int>) {
