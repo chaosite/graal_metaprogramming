@@ -24,13 +24,13 @@ fun mccarthy91(l: Long): Long {
 }
 
 data class Item(
-    val node: NodeWrapper?,
     val expression: String,
     val statements: String = "",
-    val condition: String = ""
+    val condition: String = "",
+    val relatedValues: List<NodeWrapper> = listOf()
 ) {
     companion object {
-        fun default(): Item = Item(null, "", "")
+        fun default(): Item = Item("")
     }
 }
 
@@ -45,13 +45,14 @@ digraph G {
 	y -> arith [ label="is('DATA') and name() = 'y'" ];
 }
 """
+
     val arithmeticQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
         val node = captureGroups.getValue("arithmeticNode").first()
         val x = captureGroups.getValue("x").first()
         val y = captureGroups.getValue("y").first()
-        val xText = nodeState.getValue(x).expression
-        val yText = nodeState.getValue(y).expression
-        nodeState[node] = Item(node, "$xText ${arithmeticNodeToText(node)} $yText")
+        val xText = state.getValue(x).expression
+        val yText = state.getValue(y).expression
+        state[node] = Item("$xText ${arithmeticNodeToText(node)} $yText")
     }
 
     private fun arithmeticNodeToText(node: NodeWrapper): String =
@@ -64,7 +65,7 @@ digraph G {
 """
 
     val constant: CaptureGroupAction<Item> by { nodes: List<NodeWrapper> ->
-        Item(node = nodes.first(), expression = NodeWrapperUtils.getConstantValue(nodes.first()))
+        Item(expression = NodeWrapperUtils.getConstantValue(nodes.first()))
     }
 
     val valuePhiQuery by """
@@ -74,7 +75,7 @@ digraph G {
 """
 
     val valuephi: CaptureGroupAction<Item> by { nodes: List<NodeWrapper> ->
-        Item(node = nodes.first(), expression = "phi${nodes.first().id}")
+        Item(expression = "phi${nodes.first().id}")
     }
 
     val parameterQuery by """
@@ -84,7 +85,7 @@ digraph G {
 """
 
     val parameter: CaptureGroupAction<Item> by { nodes: List<NodeWrapper> ->
-        Item(node = nodes.first(), expression = "parameter${nodes.first().id}")
+        Item(expression = "parameter${nodes.first().id}")
     }
 
 
@@ -99,7 +100,7 @@ digraph G {
     val ifConditionQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
         val node = captureGroups.getValue("ifnode").first()
         val condition = captureGroups.getValue("ifcondition").first()
-        nodeState[node] = Item(node, nodeState.getValue(condition).expression)
+        state[node] = Item(state.getValue(condition).expression)
     }
 
     val ifPathQuery by """
@@ -118,9 +119,27 @@ digraph G {
         val nextTrue = captureGroups.getValue("truepath").first()
         val nextFalse = captureGroups.getValue("falsepath").first()
 
-        nodeState[nextTrue] = nodeState.getValue(nextTrue).copy(condition = nodeState.getValue(ifNode).expression)
-        nodeState[nextFalse] =
-            nodeState.getValue(nextFalse).copy(condition = "!(${nodeState.getValue(ifNode).expression})")
+        state[nextTrue] = state.getValue(nextTrue).copy(condition = state.getValue(ifNode).expression)
+        state[nextFalse] =
+            state.getValue(nextFalse).copy(condition = "!(${state.getValue(ifNode).expression})")
+    }
+
+    val frameStateQuery by """
+digraph G {
+	framestate [ label="is('FrameState')"];
+	merge [ label="(?P<mergenode>)|1 = 1"]
+	values [ label="[](?P<phivalues>)|1 = 1"]
+
+	values -> framestate [ label = "is('DATA') and name() = 'values'"];
+	framestate -> merge [ label = "is('DATA') and name() = 'stateAfter'"];
+}
+"""
+
+    val frameStateQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+        val mergeNode = captureGroups.getValue("mergenode").first()
+        val values = captureGroups.getValue("phivalues")
+
+        state[mergeNode] = state.getValue(mergeNode).copy(relatedValues = values)
     }
 
     val loopQuery by """
@@ -140,21 +159,19 @@ digraph G {
         val begin = captureGroups.getValue("loopBegin").first()
         val end = captureGroups.getValue("loopEnd").first()
         val nodes = captureGroups.getValue("innerPath")
-        val condition = nodes.asSequence().map(nodeState::getValue).map(Item::condition).filter(String::isNotEmpty)
+        val condition = nodes.asSequence().map(state::getValue).map(Item::condition).filter(String::isNotEmpty)
             .joinToString(" && ")
-        val phis = graph.vertexSet().filter { it.node.toString().contains("ValuePhi") }
-        val relatedPhis = phis.filter { graph.containsEdge(begin, it) }
-        val values = relatedPhis.joinToString("\n") { phi ->
+        val values = state.getValue(begin).relatedValues.joinToString("\n") { phi ->
             val edge = graph.incomingEdgesOf(phi).filter { it.name.startsWith("from ") }
                 .filterIsInstance<PhiEdgeWrapper>().find { it.from == end }
             if (edge != null) {
                 val valueNode = graph.getEdgeSource(edge)
-                "${nodeState.getValue(phi).expression} := ${nodeState.getValue(valueNode).expression}"
+                "${state.getValue(phi).expression} := ${state.getValue(valueNode).expression}"
             } else ""
         }
 
         // Make the text thing
-        nodeState[end] = nodeState.getValue(end).copy(
+        state[end] = state.getValue(end).copy(
             statements = """
 ${end.id}:
    assume $condition

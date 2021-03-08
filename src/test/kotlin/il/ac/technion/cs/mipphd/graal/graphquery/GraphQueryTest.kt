@@ -29,6 +29,17 @@ val maximumQueryText = """
     }
 """.trimIndent()
 
+val repeatedNodesQueryText = """
+    digraph G {
+    	framestate [ label="is('FrameState')"];
+    	merge [ label="1 = 1"]
+    	values [ label="[]|1 = 1"]
+
+    	values -> framestate [ label = "is('DATA') and name() = 'values'"];
+    	framestate -> merge [ label = "is('DATA') and name() = 'stateAfter'"];
+    }
+""".trimIndent()
+
 internal class GraphQueryTest {
     val methodToGraph = MethodToGraph()
     val maximum = Listable::maximum.javaMethod
@@ -53,6 +64,16 @@ internal class GraphQueryTest {
     fun `minimal query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         assertEquals(2, GraphMaker.createMinimalQuery().match(cfg).size)
+    }
+
+    @Test
+    fun `repeated query matches maximum function ir`() {
+        val cfg = methodToGraph.getCFG(maximum)
+        val results = GraphQuery.importQuery(repeatedNodesQueryText).match(cfg)
+
+        println(results)
+
+        assertEquals(19, results.size)
     }
 
     @Test

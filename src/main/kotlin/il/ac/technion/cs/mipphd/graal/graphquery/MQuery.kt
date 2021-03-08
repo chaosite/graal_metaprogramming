@@ -125,6 +125,11 @@ sealed class MetadataOption {
     object Kleene : MetadataOption() {
         override fun serialize() = "*"
     }
+
+    object Repeated : MetadataOption() {
+        override fun serialize() = "[]"
+    }
+
     data class CaptureName(val name: String) : MetadataOption() {
         override fun serialize() = "(?P<$name>)"
     }
@@ -136,7 +141,8 @@ data class Metadata(val query: MQuery, val options: List<MetadataOption> = listO
     override fun type(target: QueryTarget) = query.type(target)
     override fun typecheck(target: QueryTarget) = query.typecheck(target)
     override fun value(target: QueryTarget) = query.value(target)
-    override fun serialize() = (if (options.isNotEmpty()) "${options.joinToString { it.serialize() }}|" else "") + query.serialize()
+    override fun serialize() =
+        (if (options.isNotEmpty()) "${options.joinToString { it.serialize() }}|" else "") + query.serialize()
 }
 
 data class FuncCall(val func: MQuery, val parameters: List<MQuery>) : MQuery() {
@@ -189,6 +195,8 @@ val mGrammar = object : Grammar<MQuery>() {
     val int by regexToken("""-?[0-9]+""")
     val lpar by literalToken("(")
     val rpar by literalToken(")")
+    val lbra by literalToken("[")
+    val rbra by literalToken("]")
     val comma by literalToken(",")
     val dot by literalToken(".")
     val not by literalToken("not")
@@ -235,13 +243,14 @@ val mGrammar = object : Grammar<MQuery>() {
     val orChain by leftAssociative(andChain, or) { l, _, r -> Or(l, r) }
 
     val option: Parser<MetadataOption> by (
-            kleeneStar asJust MetadataOption.Kleene) or
-            ((-lpar * -question * id * -langle * id * -rangle * -rpar) map {
+            kleeneStar asJust MetadataOption.Kleene) or (
+            (-lpar * -question * id * -langle * id * -rangle * -rpar) map {
                 when (it.t1.text) {
                     "P" -> MetadataOption.CaptureName(it.t2.text)
                     else -> throw RuntimeException("Unexpected option character '${it.t1.text}'")
-                } }
-            )
+                }
+            }) or (
+            (lbra * rbra) asJust MetadataOption.Repeated)
 
     val metadata: Parser<MQuery> by (
             oneOrMore(option) * -pipe * orChain map { Metadata(it.t2, it.t1) }) or

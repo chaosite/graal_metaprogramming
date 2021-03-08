@@ -28,6 +28,14 @@ internal class MQueryTest {
         }
 
         @Test
+        fun `metadata repeated test`() {
+            val res = parseMQuery("[]|1 = 1")
+            res shouldBeInstanceOf Metadata::class
+            res as Metadata
+            res.options shouldContain MetadataOption.Repeated
+        }
+
+        @Test
         fun `metadata capture test`() {
             val res = parseMQuery("(?P<foo>)|1 = 1")
             res shouldBeInstanceOf Metadata::class

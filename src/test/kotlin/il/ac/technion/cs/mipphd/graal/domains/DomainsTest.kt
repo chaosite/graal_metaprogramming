@@ -42,7 +42,10 @@ internal class DomainsTest {
 
             val results = executor.iterateUntilFixedPoint()
 
-            println(results)
+            for ((_, item) in results) {
+                if (item.statements.isNotEmpty())
+                    println(item.statements)
+            }
         }
 
         @Disabled

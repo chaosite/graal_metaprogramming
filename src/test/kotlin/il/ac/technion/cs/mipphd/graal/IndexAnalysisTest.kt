@@ -1,5 +1,6 @@
 package il.ac.technion.cs.mipphd.graal
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import kotlin.reflect.jvm.javaMethod
 
@@ -33,11 +34,13 @@ internal class IndexAnalysisTest {
     val firstEvenMethod = Listable::firstEven.javaMethod
     val maximum = Listable::maximum.javaMethod
     @Test
+    @Disabled
     fun `run analysis on firstEven`() {
         // TODO: Rewrite
     }
 
     @Test
+    @Disabled
     fun `run analysis on maximum`() {
         // TODO: Rewrite
     }

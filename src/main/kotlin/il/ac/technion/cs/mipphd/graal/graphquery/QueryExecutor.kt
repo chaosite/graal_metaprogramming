@@ -33,7 +33,7 @@ abstract class QueryExecutor<T>(
     open val captureGroupActions: Map<String, CaptureGroupAction<T>> get() = _captureGroupActions.toMap()
     open val wholeMatchActions: Map<String, WholeMatchAction> get() = _wholeMatchActions.toMap()
     open val queries: Map<String, GraphQuery> get() = _queries.toMap()
-    open var nodeState: MutableMap<NodeWrapper, T> = MapProxy(hashMapOf<NodeWrapper, T>()).withDefault { initializer() }
+    open var state: MutableMap<NodeWrapper, T> = MapProxy(hashMapOf<NodeWrapper, T>()).withDefault { initializer() }
 
     protected operator fun CaptureGroupAction<T>.provideDelegate(thisRef: QueryExecutor<T>, property: KProperty<*>) =
         also {
@@ -67,15 +67,15 @@ abstract class QueryExecutor<T>(
         val matches: List<Pair<String, GraphQueryMatch>> = queries
             .flatMap { (name, query) -> query.match(graph).map { Pair(name, it) } }
 
-        nodeState = MapProxy(hashMapOf<NodeWrapper, T>()).withDefault { initializer() }
+        state = MapProxy(hashMapOf<NodeWrapper, T>()).withDefault { initializer() }
         for (i in 0..limit) {
             hasChanged = false
-            matches.asSequence().map(this::executeWithState).forEach(nodeState::putAll)
+            matches.asSequence().map(this::executeWithState).forEach(state::putAll)
             if (!hasChanged)
                 break
 
         }
-        return nodeState
+        return state
     }
 
     private fun executeWithState(namedMatch: Pair<String, GraphQueryMatch>): Map<NodeWrapper, T> {

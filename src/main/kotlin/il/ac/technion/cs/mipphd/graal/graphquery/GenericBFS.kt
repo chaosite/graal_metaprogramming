@@ -22,7 +22,15 @@ fun possibleChildrenMatches(query: GraphQuery, graph: GraalAdapter, queryV: Grap
             Pair(queryW, (
                     if (qe.matchType == GraphQueryEdgeMatchType.KLEENE)
                         kleeneTransitiveClosure(graph, queryV, qe, graphV, dir)
-                            .flatMap { path -> singleStep(graph, queryV, qe, path.last(), dir).map { path + it } } // ??
+                            .flatMap { path ->
+                                singleStep(
+                                    graph,
+                                    queryV,
+                                    qe,
+                                    path.last(),
+                                    dir
+                                ).map { path + it }
+                            } // ??
                     else singleStep(graph, queryV, qe, graphV, dir)
                     ).filter { queryW.match(it.last()) })
     }.toMap())
@@ -126,7 +134,7 @@ fun bfsMatch(
     }
     val fullMatches = mutableListOf<Map<GraphQueryVertex<*>, List<NodeWrapper>>>()
 
-    var maxMatches : Map<GraphQueryVertex<*>, List<NodeWrapper>> = mapOf()
+    var maxMatches: Map<GraphQueryVertex<*>, List<NodeWrapper>> = mapOf()
 
     while (!workset.isEmpty()) {
         val (matches, queue) = workset.removeFirst()
@@ -147,7 +155,9 @@ fun bfsMatch(
         val childrenMatches = possibleChildrenMatches(query, graph, qV, gV.last()).map(::permutations)
         childrenMatches.forEach { options ->
             options.forEach { childrenMatch ->
-                if (childrenMatch.filter { newMatches.containsKey(it.key) }.all { newMatches.getValue(it.key).last() == it.value.last() })
+                // TODO: Why is last() needed?
+                if (childrenMatch.filter { newMatches.containsKey(it.key) }
+                        .all { newMatches.getValue(it.key).last() == it.value.last() })
                     workset.add(
                         WorkItem(
                             newMatches,
@@ -158,5 +168,17 @@ fun bfsMatch(
         }
     }
 
-    return fullMatches
+    return groupRepeated(query, fullMatches)
+}
+
+fun groupRepeated(
+    query: GraphQuery,
+    matches: List<Map<GraphQueryVertex<*>, List<NodeWrapper>>>
+): List<Map<GraphQueryVertex<*>, List<NodeWrapper>>> {
+    val repeatedQueryNodes = query.vertexSet().filterIsInstance<GraphQueryVertexM>()
+        .filter { (it.mQuery as Metadata).options.contains(MetadataOption.Repeated) }
+    return matches
+        .groupBy { match -> match.filterKeys { key -> !repeatedQueryNodes.contains(key) } }
+        .map { (key, value) -> key.entries + value.flatMap { it.filterKeys(repeatedQueryNodes::contains).entries } }
+        .map { match -> match.groupBy { it.key }.mapValues { (_, values) -> values.map { it.value }.flatten() } }
 }
