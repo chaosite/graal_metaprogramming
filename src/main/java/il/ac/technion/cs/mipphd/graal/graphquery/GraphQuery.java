@@ -35,7 +35,7 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex<? extends N
     }
 
     protected Stream<Map<GraphQueryVertex<? extends NodeInterface>, List<NodeWrapper>>> _match(GraalAdapter cfg) {
-        return GenericBFSKt.bfsMatch(this, cfg, this.leastCommonVertex(cfg)).stream()
+        return GenericBFSKt.bfsMatch(this, cfg, this.startCandidate(cfg)).stream()
                 .map(v -> (Map<GraphQueryVertex<? extends NodeInterface>, List<NodeWrapper>>) v);
     }
 
@@ -63,8 +63,11 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex<? extends N
         return e;
     }
 
-    private GraphQueryVertex<? extends NodeInterface> leastCommonVertex(GraalAdapter cfg) {
+    private GraphQueryVertex<? extends NodeInterface> startCandidate(GraalAdapter cfg) {
         final Set<NodeWrapper> nodes = new HashSet<>(cfg.vertexSet());
+        Optional<GraphQueryVertex<? extends NodeInterface>> root = this.vertexSet().stream().filter(v -> this.inDegreeOf(v) == 0).findAny();
+        if (root.isPresent())
+            return root.get();
         // TODO: Improve this, filtering out the ReturnNodes isn't good enough.
         Map<Long, List<GraphQueryVertex<? extends NodeInterface>>> histogram = this.vertexSet().stream().filter(v -> !ReturnNode.class.isAssignableFrom(v.getClazz())).collect(Collectors.groupingBy(v -> nodes.stream().map(NodeWrapper::getNode).filter(v::match).count()));
         return histogram.get(histogram.keySet().stream().min(Comparator.naturalOrder()).get()).get(0);

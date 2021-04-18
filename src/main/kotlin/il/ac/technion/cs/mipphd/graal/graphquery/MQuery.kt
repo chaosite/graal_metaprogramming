@@ -203,6 +203,7 @@ val mGrammar = object : Grammar<MQuery>() {
     val and by literalToken("and")
     val or by literalToken("or")
     val eq by literalToken("=")
+    val ne by literalToken("!=")
     val id by regexToken("""\w+""")
     val kleeneStar by literalToken("*")
     val pipe by literalToken("|")
@@ -236,7 +237,8 @@ val mGrammar = object : Grammar<MQuery>() {
                     outer.t2?.invoke(f) ?: f
                 }
             }) or
-            (-eq * parser(this::value) map { outer -> { inner -> Equals(inner, outer) } })
+            (-eq * parser(this::value) map { outer -> { inner -> Equals(inner, outer) } }) or
+            (-ne * parser(this::value) map { outer -> { inner -> Not(Equals(inner, outer)) } })
     val value: Parser<MQuery> by negation or nonLeftRecursive or literal
 
     val andChain by leftAssociative(value, and) { l, _, r -> And(l, r) }
@@ -245,7 +247,7 @@ val mGrammar = object : Grammar<MQuery>() {
     val option: Parser<MetadataOption> by (
             kleeneStar asJust MetadataOption.Kleene) or (
             (-lpar * -question * id * -langle * id * -rangle * -rpar) map {
-                when (it.t1.text) {
+                when (it.t1.text) {  
                     "P" -> MetadataOption.CaptureName(it.t2.text)
                     else -> throw RuntimeException("Unexpected option character '${it.t1.text}'")
                 }

@@ -3,8 +3,8 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.Listable
 import il.ac.technion.cs.mipphd.graal.MethodToGraph
+import org.graalvm.compiler.nodes.PhiNode
 import org.graalvm.compiler.nodes.ValuePhiNode
-import org.graalvm.compiler.nodes.ValueProxyNode
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import kotlin.reflect.jvm.javaMethod
@@ -63,8 +63,11 @@ internal class GenericBFSTest {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphMaker.createSimpleKleeneQueryWithReturn()
         val vertex = query.vertexSet().first()
+        val graph = GraalAdapter.fromGraal(cfg)
 
-        val results = bfsMatch(query, GraalAdapter.fromGraal(cfg), vertex)
+        val results = bfsMatch(query, graph, vertex)
+
+        println(results)
 
         assertEquals(1, results.size)
     }
@@ -78,23 +81,22 @@ internal class GenericBFSTest {
     fun `possibleChildrenMatches returns something in Kleene case`() {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphMaker.createMaxGraph()
-        val queryReturnKleene = query.edgeSet().stream()
-            .filter{ it.getMatchType() == GraphQueryEdgeMatchType.KLEENE }
+        val queryReturnPhi = query.edgeSet().stream()
+            .filter{ it.matchType == GraphQueryEdgeMatchType.KLEENE }
             .map(query::getEdgeSource)
             .toList()
-            .first { it.clazz == ValueProxyNode::class.java }
+            .first { it.clazz == PhiNode::class.java }
+        val queryReturnKleene = query.getEdgeTarget(query.outgoingEdgesOf(queryReturnPhi).last())
         val adaptedCfg = GraalAdapter.fromGraal(cfg)
-        val graphReturnKleene = adaptedCfg.vertexSet().stream()
+        val graphReturnPhi = adaptedCfg.vertexSet().stream()
             .filter { it.node.asNode().javaClass == ValuePhiNode::class.java }
-            .map(adaptedCfg::outgoingEdgesOf)
             .toList()
             .last()
-            .map(adaptedCfg::getEdgeTarget)
-            .last { it.node.javaClass == ValueProxyNode::class.java }
-        assertTrue(queryReturnKleene.match(graphReturnKleene)) // sanity
+        val result = possibleChildrenMatches(query, adaptedCfg, queryReturnPhi, graphReturnPhi)
 
-        val result = possibleChildrenMatches(query, adaptedCfg, queryReturnKleene, graphReturnKleene)
+        assertTrue(queryReturnPhi.match(graphReturnPhi)) // sanity
         println(result)
+        assertEquals(2, result.maxOf { it[queryReturnKleene]!!.size })
     }
 
     @Test

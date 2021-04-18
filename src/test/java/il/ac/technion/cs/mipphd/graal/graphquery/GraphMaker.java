@@ -16,13 +16,13 @@ public class GraphMaker {
         GraphQueryVertex<ValueProxyNode> returnKleene = ret.addVertex(ValueProxyNode.class);
         GraphQueryVertex<ReturnNode> theReturn = ret.addVertex(ReturnNode.class);
 
-        ret.addEdge(get, getKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
-        ret.addEdge(getKleene, conditional, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(get, getKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(getKleene, conditional, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
         ret.addEdge(conditionNode, conditional);
         ret.addEdge(conditional, returnValuePhi, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
         ret.addEdge(returnValuePhi, conditional, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
-        ret.addEdge(returnValuePhi, returnKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
-        ret.addEdge(returnKleene, theReturn, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(returnValuePhi, returnKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(returnKleene, theReturn, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
 
         return ret;
     }
@@ -42,8 +42,8 @@ public class GraphMaker {
         GraphQueryVertex<ValueProxyNode> returnKleene = ret.addVertex(ValueProxyNode.class);
         GraphQueryVertex<ReturnNode> theReturn = ret.addVertex(ReturnNode.class);
 
-        ret.addEdge(returnValuePhi, returnKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
-        ret.addEdge(returnKleene, theReturn, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(returnValuePhi, returnKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(returnKleene, theReturn, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
 
         return ret;
     }
@@ -56,8 +56,8 @@ public class GraphMaker {
         GraphQueryVertex<ValueNode> getKleene = ret.addVertex(ValueNode.class);
         GraphQueryVertex<ConditionalNode> conditional = ret.addVertex(ConditionalNode.class);
 
-        ret.addEdge(get, getKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
-        ret.addEdge(getKleene, conditional, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(get, getKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(getKleene, conditional, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
 
         return ret;
     }
@@ -80,8 +80,8 @@ public class GraphMaker {
         GraphQueryVertex<ValueNode> returnKleene = ret.addVertex(ValueNode.class, node -> !(node instanceof ReturnNode));
         GraphQueryVertex<ReturnNode> theReturn = ret.addVertex(ReturnNode.class);
 
-        ret.addEdge(someNode, returnKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
-        ret.addEdge(returnKleene, theReturn, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(someNode, returnKleene, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.KLEENE);
+        ret.addEdge(returnKleene, theReturn, GraphQueryEdgeType.DATA_FLOW, GraphQueryEdgeMatchType.NORMAL);
 
         return ret;
     }

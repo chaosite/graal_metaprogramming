@@ -19,13 +19,13 @@ val maximumQueryText = """
       n484969820 [ label="is('PhiNode')" ];
       n1314376406 [ label="is('ValueProxyNode')" ];
       n1744166494 [ label="is('ReturnNode')" ];
-      n2021302077 -> n1948571966 [ label="is('DATA')" ];
-      n1948571966 -> n1689892436 [ label="*|is('DATA')" ];
+      n2021302077 -> n1948571966 [ label="*|is('DATA')" ];
+      n1948571966 -> n1689892436 [ label="is('DATA')" ];
       n818409230 -> n1689892436 [ label="is('DATA') or is('CONTROL')" ];
       n1689892436 -> n484969820 [ label="is('DATA')" ];
       n484969820 -> n1689892436 [ label="is('DATA')" ];
-      n484969820 -> n1314376406 [ label="is('DATA')" ];
-      n1314376406 -> n1744166494 [ label="*|is('DATA')" ];
+      n484969820 -> n1314376406 [ label="*|is('DATA')" ];
+      n1314376406 -> n1744166494 [ label="is('DATA')" ];
     }
 """.trimIndent()
 

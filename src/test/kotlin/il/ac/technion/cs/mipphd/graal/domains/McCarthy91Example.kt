@@ -27,7 +27,8 @@ data class Item(
     val expression: String,
     val statements: String = "",
     val condition: String = "",
-    val relatedValues: List<NodeWrapper> = listOf()
+    val relatedValues: List<NodeWrapper> = listOf(),
+    val mergeValues: Map<NodeWrapper, Map<NodeWrapper, NodeWrapper>> = mapOf()
 ) {
     companion object {
         fun default(): Item = Item("")
@@ -126,49 +127,69 @@ digraph G {
 
     val frameStateQuery by """
 digraph G {
-	framestate [ label="is('FrameState')"];
-	merge [ label="(?P<mergenode>)|1 = 1"]
-	values [ label="[](?P<phivalues>)|1 = 1"]
+	framestate [ label="is('FrameState')" ];
+	merge [ label="(?P<mergenode>)|is('AbstractMergeNode')" ];
+	values [ label="[](?P<phivalues>)|1 = 1" ];
+    sourcevalues [ label="[](?P<phisourcevalues>)|1 = 1" ];
 
-	values -> framestate [ label = "is('DATA') and name() = 'values'"];
-	framestate -> merge [ label = "is('DATA') and name() = 'stateAfter'"];
+	values -> framestate [ label = "is('DATA') and name() = 'values'" ];
+    merge -> values [ label = "name() = 'merge'" ];
+    sourcevalues -> values [ label = "name() != 'merge'" ];
+	framestate -> merge [ label = "is('DATA') and name() = 'stateAfter'" ];
 }
 """
 
     val frameStateQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
         val mergeNode = captureGroups.getValue("mergenode").first()
         val values = captureGroups.getValue("phivalues")
+        val sourceValues = captureGroups.getValue("phisourcevalues")
 
-        state[mergeNode] = state.getValue(mergeNode).copy(relatedValues = values)
+        println(captureGroups)
+
+        val map = mutableMapOf<NodeWrapper, MutableMap<NodeWrapper, NodeWrapper>>()
+        for (phi in values) {
+            for (value in sourceValues) {
+                val edge = graph.getEdge(value, phi) as PhiEdgeWrapper?
+                if (edge != null) {
+                    if (edge.from !in map) {
+                        map[edge.from] = mutableMapOf()
+                    }
+                    map.getValue(edge.from)[phi] = value
+                }
+            }
+        }
+        println(map)
+        state[mergeNode] = state.getValue(mergeNode).copy(relatedValues = values, mergeValues = map)
     }
 
     val loopQuery by """
 digraph G {
+  loopPrev  [ label="(?P<loopPrev>)|not is ('LoopEndNode')" ];
   loopBegin [ label="(?P<loopBegin>)|is('LoopBeginNode')" ];
   loopEnd [ label="(?P<loopEnd>)|is('LoopExitNode') or is('LoopEndNode')" ];
-  someNode [ label="not is('LoopEndNode') and not is('LoopExitNode')" ]
+  someNode [ label="(?P<firstInPath>)|not is('LoopEndNode') and not is('LoopExitNode')" ]
   someNodeKleene [ label="(?P<innerPath>)|not is('LoopEndNode') and not is('LoopExitNode')" ]
 
+  loopPrev -> loopBegin [ label="is('CONTROL')" ];
   loopBegin -> loopEnd [ label="is('ASSOCIATED') and name() = 'loopBegin'" ];
-  loopBegin -> someNode [ label="is('CONTROL')" ]
-  someNode -> someNodeKleene [ label="*|is('CONTROL')" ]
-  someNodeKleene -> loopEnd [ label="is('CONTROL')"]
+  loopBegin -> someNode [ label="is('CONTROL')" ];
+  someNode -> someNodeKleene [ label="*|is('CONTROL')" ];
+  someNodeKleene -> loopEnd [ label="is('CONTROL')"];
 }
 """
     val loopQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
         val begin = captureGroups.getValue("loopBegin").first()
+        val prev = captureGroups.getValue("loopPrev").first()
         val end = captureGroups.getValue("loopEnd").first()
-        val nodes = captureGroups.getValue("innerPath")
+        val nodes = captureGroups.getValue("firstInPath") + captureGroups.getValue("innerPath") + end
+
         val condition = nodes.asSequence().map(state::getValue).map(Item::condition).filter(String::isNotEmpty)
             .joinToString(" && ")
-        val values = state.getValue(begin).relatedValues.joinToString("\n") { phi ->
-            val edge = graph.incomingEdgesOf(phi).filter { it.name.startsWith("from ") }
-                .filterIsInstance<PhiEdgeWrapper>().find { it.from == end }
-            if (edge != null) {
-                val valueNode = graph.getEdgeSource(edge)
+
+        val values =
+            state[begin]!!.mergeValues.let { it[end] ?: it[prev] }!!.entries.joinToString("\n") { (phi, valueNode) ->
                 "${state.getValue(phi).expression} := ${state.getValue(valueNode).expression}"
-            } else ""
-        }
+            }
 
         // Make the text thing
         state[end] = state.getValue(end).copy(
@@ -179,5 +200,37 @@ ${values.prependIndent("   ")}
    goto ${begin.id}
 """.trimIndent()
         )
+    }
+
+    val mergeNodeQuery by """
+digraph G {
+    mergeBegin [ label="(?P<mergeBegin>)|is('StartNode') or is('AbstractMergeNode') or is('LoopExitNode')" ];
+    someNode [ label="(?P<mergePath>)|not is('AbstractMergeNode') and not is ('ReturnNode') and not is('LoopEndNode') and not is ('LoopExitNode')" ];
+    mergeEnd [ label="(?P<mergeEnd>)|is('AbstractMergeNode')" ];
+    
+    mergeBegin -> someNode [ label="*|is('CONTROL')" ];
+    someNode -> mergeEnd [ label="is('CONTROL')" ];
+}
+    """
+
+    val mergeNodeQueryAction: WholeMatchAction by { captureGroupActions: Map<String, List<NodeWrapper>> ->
+        val begin = captureGroupActions["mergeBegin"]!!.first()
+        val end = captureGroupActions["mergeEnd"]!!.first()
+        val nodes = listOf(begin) + captureGroupActions["mergePath"]!!
+
+        val condition = nodes.asSequence().map(state::getValue).map(Item::condition).filter(String::isNotEmpty)
+            .joinToString(" && ")
+
+
+        val values =
+            state[end]!!.mergeValues[nodes.last()]?.entries?.joinToString("\n") { (phi, valueNode) ->
+                "${state.getValue(phi).expression} := ${state.getValue(valueNode).expression}"
+            }
+
+        println(nodes.hashCode())
+        println(nodes.last())
+        println(state[end]!!.mergeValues)
+        println(condition)
+        println(values)
     }
 }

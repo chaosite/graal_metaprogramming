@@ -20,14 +20,27 @@ val junitVersion = "5.7.0"
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation(kotlin("reflect"))
+
+    // ReactiveX
     implementation("io.reactivex.rxjava3", "rxjava", "3.0.4")
     implementation("io.reactivex.rxjava3", "rxkotlin", "3.0.0")
+
+    // Arrow (should use sparingly?)
+    implementation("io.arrow-kt", "arrow-core", "0.11.0")
+
+    // Graal
     implementation("org.graalvm.sdk", "graal-sdk", graalVersion)
     implementation("org.graalvm.compiler", "compiler", graalVersion)
     implementation("org.graalvm.tools", "insight", graalVersion)
+
+    // jgrapht
     implementation("org.jgrapht", "jgrapht-core", jgraphtVersion)
     implementation("org.jgrapht", "jgrapht-io", jgraphtVersion)
+
+    // spotbugs annotations (for @NonNull in Java)
     implementation("com.github.spotbugs", "spotbugs-annotations", "4.2.0")
+
+    // better-parse parser library
     implementation("com.github.h0tk3y.betterParse", "better-parse","0.4.1")
 
     // Elina
