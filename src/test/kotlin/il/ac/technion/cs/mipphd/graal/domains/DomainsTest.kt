@@ -28,7 +28,7 @@ internal class DomainsTest {
             val adapted = GraalAdapter.fromGraal(cfg)
 
             val sw = StringWriter()
-            adapted.exportQuery(sw)
+            adapted.exportQuery(sw, null)
 
             println(sw.buffer)
             assertTrue(true)

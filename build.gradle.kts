@@ -13,7 +13,7 @@ allprojects {
     }
 }
 
-val graalVersion = "21.0.0"
+val graalVersion = "21.3.0"
 val jgraphtVersion = "1.5.0"
 val junitVersion = "5.7.0"
 

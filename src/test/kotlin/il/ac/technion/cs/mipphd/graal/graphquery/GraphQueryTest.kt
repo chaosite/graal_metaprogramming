@@ -1,13 +1,23 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
+import arrow.core.extensions.map.foldable.find
 import il.ac.technion.cs.mipphd.graal.Listable
 import il.ac.technion.cs.mipphd.graal.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.graphquery.GraphMaker.*
+import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import org.graalvm.compiler.graph.NodeInterface
+import org.graalvm.compiler.nodes.ValuePhiNode
+import org.graalvm.compiler.nodes.calc.AddNode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.io.PrintWriter
 import java.io.StringReader
 import java.io.StringWriter
+import java.util.*
+import java.util.function.BiConsumer
+import java.util.function.Consumer
+import kotlin.collections.HashMap
 import kotlin.reflect.jvm.javaMethod
 
 val maximumQueryText = """
@@ -113,5 +123,147 @@ internal class GraphQueryTest {
             assertTrue(set.any { (queryNode as GraphQueryVertex<NodeInterface>).match(it) }, "Couldn't find $queryNode")
         }
         assertEquals(18, query.match(cfg).size)
+    }
+
+    @Test
+    fun `imported anon graph query union`() {
+        val cfg = AnonGraphReduced();
+        val query = UnionUsingArrayDotQuery();
+        val strwriter = StringWriter()
+        query.exportQuery(strwriter)
+        println(strwriter)
+        val results = query.match(cfg);
+        val path = "/home/dor/Desktop/PG/dots/unionquery/"
+        results.forEachIndexed { i, r ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, query, r.toMap());
+        }
+    }
+
+
+    @Test
+    fun `imported anon graph query loop with index and loadfield`() {
+        val cfg = AnonGraphReduced();
+        val query = LoopWithIteratorWithExtraStepsDotQuery();
+        val results = query.match(cfg);
+        val path = "/home/dor/Desktop/PG/dots/loops/"
+        val strwriter = StringWriter()
+        query.exportQuery(strwriter)
+        println(strwriter)
+        results.forEachIndexed { i, r ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, query, r.toMap());
+        }
+    }
+
+    @Test
+    fun `imported anon graph query phi inc`() {
+        val cfg = AnonGraphReduced();
+        val query = PhiNodesIncDotQuery();
+        val results = query.match(cfg);
+        val path = "/home/dor/Desktop/PG/dots/incphi/"
+        val strwriter = StringWriter()
+        query.exportQuery(strwriter)
+        println(strwriter)
+        results.forEachIndexed { i, r ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, query, r.toMap());
+        }
+    }
+
+    @Test
+    fun `imported anon graph query split node`() {
+        val cfg = AnonGraphReduced();
+        val query = SplitCollectionIndexedPairDotQuery();
+        val results = query.match(cfg);
+        val strwriter = StringWriter()
+        query.exportQuery(strwriter)
+        println(strwriter)
+        val path = "/home/dor/Desktop/PG/dots/splitnode/"
+        results.forEachIndexed { i, r ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+
+            cfg.exportQuery(writer, query, r.toMap());
+
+        }
+    }
+
+    @Test
+    fun `imported anon graph query combined`() {
+        val path = "/home/dor/Desktop/PG/dots/matchquries1/"
+        val cfg = AnonGraphReduced();
+        val unionQuery = UnionUsingArrayDotQuery()
+        val splitNodeQuery = SplitCollectionIndexedPairDotQuery()
+//        val loopIndexQuery = LoopWithIteratorWithExtraStepsDotQuery()
+        val loopIndexQuery = PhiNodesIncDotQuery()
+        val phiNodeLoop = loopIndexQuery.vertexSet().find { v -> v.label().contains("Phi") }
+        val phiNodeSplit = splitNodeQuery.vertexSet().find { v -> v.label().contains("Phi") }
+        val unionResults = unionQuery.match(cfg)
+        val splitResults = splitNodeQuery.match(cfg)
+        val loopsResults = loopIndexQuery.match(cfg)
+        var i = 0
+        unionResults.forEach() { unionR ->
+            splitResults.forEach() { splitR ->
+                loopsResults.forEach() { loopR ->
+                    val valueNode = unionR.keys.find { v -> v.captureGroup() == Optional.of("value") }
+                    val unionM = unionR[valueNode]
+                    val collectionNode = splitR.keys.find { v -> v.captureGroup() == Optional.of("collection") }
+                    val splitM = splitR[collectionNode]
+                    val splitPhi = splitR[phiNodeSplit]
+                    val loopM = loopR[phiNodeLoop]
+                    if (loopM != null && splitM != null && unionM != null && splitPhi != null) {
+                        if (splitM[0] == unionM[0] && splitPhi[0] == loopM[0]) {
+                            val combinedMap = unionR.toMutableMap()
+                            combinedMap.clear()
+                            combinedMap.putAll(unionR)
+                            combinedMap.putAll(splitR)
+                            combinedMap.putAll(loopR)
+                            val writer = PrintWriter("$path$i.dot", "UTF-8")
+                            i += 1
+                            cfg.exportQuery(writer, null, combinedMap);
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    @Test
+    fun `imported anon graph query combined full`() {
+        val cfg = AnonGraphReduced();
+        val query = CombinedQuery();
+        val results = query.match(cfg);
+        val strwriter = StringWriter()
+        query.exportQuery(strwriter)
+        println(strwriter)
+        val path = "/home/dor/Desktop/PG/dots/combined/"
+        results.forEachIndexed { i, r ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+
+            cfg.exportQuery(writer, query, r.toMap());
+
+        }
+    }
+
+    @Test
+    fun `query test`() {
+        val s = """
+           digraph G {
+  n674421699 [ label="is('LoopBeginNode')" ];
+  n1322240894 [ label="is('ValuePhiNode')" ];
+  n202106861 [ label="(?P<foo>)|is('calc.AddNode')" ];
+  n1969077088 [ label="is('ValueNode')" ];
+  n674421699 -> n1322240894 [ label="(1) = (1)" ];
+  n202106861 -> n1322240894 [ label="(1) = (1)" ];
+  n1322240894 -> n202106861 [ label="(1) = (1)" ];
+  n1969077088 -> n1322240894 [ label="(1) = (1)" ];
+}
+        """.trimIndent()
+        val cfg = AnonGraphReduced();
+        val query = GraphQuery.importQuery(s)
+        val results = query.match(cfg);
+        val f = results[0].keys.find { v -> v.captureGroup() == Optional.of("foo") }
+        println(f)
     }
 }
