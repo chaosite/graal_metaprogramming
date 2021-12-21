@@ -142,6 +142,10 @@ public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> 
             var label = v.getNode().toString();
             if(vmap.containsKey(v)){
                 label += " \n Matched with: " + vmap.get(v).stream().map(qqv -> qqv.label()).reduce((gqv1,gqv2) -> gqv1 + " & " + gqv2);
+                if(vmap.get(v).stream().anyMatch(qqv -> qqv.captureGroup().isPresent())){
+                    attrs.put("style", DefaultAttribute.createAttribute("filled"));
+                    attrs.put("fillcolor", DefaultAttribute.createAttribute("#00ff005f"));
+                }
             }
             attrs.put("label", DefaultAttribute.createAttribute(label));
             if(v.toString().contains("Return")){

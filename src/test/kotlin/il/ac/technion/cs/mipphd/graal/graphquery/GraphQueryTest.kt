@@ -1,23 +1,15 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
-import arrow.core.extensions.map.foldable.find
 import il.ac.technion.cs.mipphd.graal.Listable
 import il.ac.technion.cs.mipphd.graal.MethodToGraph
 import il.ac.technion.cs.mipphd.graal.graphquery.GraphMaker.*
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import org.graalvm.compiler.graph.NodeInterface
-import org.graalvm.compiler.nodes.ValuePhiNode
-import org.graalvm.compiler.nodes.calc.AddNode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.PrintWriter
 import java.io.StringReader
 import java.io.StringWriter
-import java.util.*
-import java.util.function.BiConsumer
-import java.util.function.Consumer
-import kotlin.collections.HashMap
 import kotlin.reflect.jvm.javaMethod
 
 val maximumQueryText = """
@@ -157,19 +149,20 @@ internal class GraphQueryTest {
     }
 
     @Test
-    fun `imported anon graph query phi inc`() {
+    fun `imported anon graph query loop with index and array access`() {
         val cfg = AnonGraphReduced();
-        val query = PhiNodesIncDotQuery();
-        val results = query.match(cfg);
-        val path = "/home/dor/Desktop/PG/dots/incphi/"
+        val query = LoopWithIteratorWithExtraStepsArrayDotQuery();
+        val results = query.matchPorts(cfg);
+        val path = "/home/dor/Desktop/PG/dots/loopsWithArray/"
         val strwriter = StringWriter()
         query.exportQuery(strwriter)
         println(strwriter)
-        results.forEachIndexed { i, r ->
+        results.values.forEachIndexed { i, r ->
             val writer = PrintWriter("$path$i.dot", "UTF-8")
             cfg.exportQuery(writer, query, r.toMap());
         }
     }
+
 
     @Test
     fun `imported anon graph query split node`() {
@@ -187,83 +180,249 @@ internal class GraphQueryTest {
 
         }
     }
-
     @Test
-    fun `imported anon graph query combined`() {
-        val path = "/home/dor/Desktop/PG/dots/matchquries1/"
+    fun `imported anon graph query combined with ports`(){
+        val path = "/home/dor/Desktop/PG/dots/matchquries/"
         val cfg = AnonGraphReduced();
         val unionQuery = UnionUsingArrayDotQuery()
         val splitNodeQuery = SplitCollectionIndexedPairDotQuery()
-//        val loopIndexQuery = LoopWithIteratorWithExtraStepsDotQuery()
-        val loopIndexQuery = PhiNodesIncDotQuery()
-        val phiNodeLoop = loopIndexQuery.vertexSet().find { v -> v.label().contains("Phi") }
-        val phiNodeSplit = splitNodeQuery.vertexSet().find { v -> v.label().contains("Phi") }
-        val unionResults = unionQuery.match(cfg)
-        val splitResults = splitNodeQuery.match(cfg)
-        val loopsResults = loopIndexQuery.match(cfg)
+        val loopQuery = LoopWithIteratorWithExtraStepsArrayDotQuery()
+        val unionPort_value = unionQuery.ports().find { p -> p.captureGroup().get().contains("value") }
+        val splitPort_input = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("input") }
+        val loopPort_iterator = loopQuery.ports().find { p -> p.captureGroup().get().contains("iterator") }
+
+        val unionResults = unionQuery.matchPorts(cfg)
+        val splitResults = splitNodeQuery.matchPorts(cfg)
+        val loopResults = loopQuery.matchPorts(cfg)
         var i = 0
-        unionResults.forEach() { unionR ->
-            splitResults.forEach() { splitR ->
-                loopsResults.forEach() { loopR ->
-                    val valueNode = unionR.keys.find { v -> v.captureGroup() == Optional.of("value") }
-                    val unionM = unionR[valueNode]
-                    val collectionNode = splitR.keys.find { v -> v.captureGroup() == Optional.of("collection") }
-                    val splitM = splitR[collectionNode]
-                    val splitPhi = splitR[phiNodeSplit]
-                    val loopM = loopR[phiNodeLoop]
-                    if (loopM != null && splitM != null && unionM != null && splitPhi != null) {
-                        if (splitM[0] == unionM[0] && splitPhi[0] == loopM[0]) {
-                            val combinedMap = unionR.toMutableMap()
-                            combinedMap.clear()
-                            combinedMap.putAll(unionR)
-                            combinedMap.putAll(splitR)
-                            combinedMap.putAll(loopR)
-                            val writer = PrintWriter("$path$i.dot", "UTF-8")
-                            i += 1
-                            cfg.exportQuery(writer, null, combinedMap);
-                        }
+
+        splitResults.forEach { (splitPorts, splitMatch) ->
+            val splitM = splitMatch[splitPort_input]?.get(0)
+            unionResults.forEach { (unionPorts, unionMatch) ->
+                val unionM = unionMatch[unionPort_value]?.get(0)
+                loopResults.forEach { (loopPorts, loopMatch) ->
+                    val loopM = loopMatch[loopPort_iterator]?.get(0)
+                    if (unionM == loopM && splitM == loopM) {
+                        val combinedMap = unionMatch.toMutableMap()
+                        combinedMap.clear()
+                        combinedMap.putAll(unionMatch)
+                        combinedMap.putAll(loopMatch)
+                        combinedMap.putAll(splitMatch)
+                        val writer = PrintWriter("$path$i.dot", "UTF-8")
+                        i += 1
+                        cfg.exportQuery(writer, null, combinedMap);
                     }
                 }
             }
         }
-
     }
 
     @Test
-    fun `imported anon graph query combined full`() {
+    fun `imported anon graph query invoke with param`() {
         val cfg = AnonGraphReduced();
-        val query = CombinedQuery();
+        val query = FunctionInvokeOneParamQueryDot();
         val results = query.match(cfg);
         val strwriter = StringWriter()
         query.exportQuery(strwriter)
         println(strwriter)
-        val path = "/home/dor/Desktop/PG/dots/combined/"
+        val path = "/home/dor/Desktop/PG/dots/invokesWithParam/"
         results.forEachIndexed { i, r ->
             val writer = PrintWriter("$path$i.dot", "UTF-8")
-
             cfg.exportQuery(writer, query, r.toMap());
+        }
+    }
+
+    @Test
+    fun `imported anon graph query if with cond`() {
+        val cfg = AnonGraphReduced();
+        val query = IfWithConditionQueryDot();
+        val results = query.match(cfg);
+        val strwriter = StringWriter()
+        query.exportQuery(strwriter)
+        println(strwriter)
+        val path = "/home/dor/Desktop/PG/dots/ifCond/"
+        results.forEachIndexed { i, r ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, query, r.toMap());
+        }
+    }
+
+    @Test
+    fun `imported anon graph query func invoke two param in branch`() {
+        val cfg = AnonGraphReduced();
+        val query = FunctionInvokeTwoParamInsideScopeQueryDot();
+        val results = query.match(cfg);
+        val strwriter = StringWriter()
+        query.exportQuery(strwriter)
+        println(strwriter)
+        val path = "/home/dor/Desktop/PG/dots/invokeTwoParamScope/"
+        results.forEachIndexed { i, r ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, query, r.toMap());
+        }
+    }
+
+    @Test
+    fun `imported anon graph query func invoke two param`() {
+        val cfg = AnonGraphReduced();
+        val query = FunctionInvokeTwoParamInsideQueryDot();
+        val results = query.match(cfg);
+        val strwriter = StringWriter()
+        query.exportQuery(strwriter)
+        println(strwriter)
+        val path = "/home/dor/Desktop/PG/dots/invokeTwoParam/"
+        results.forEachIndexed { i, r ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, query, r.toMap());
+        }
+    }
+
+    @Test
+    fun `uber match anon algo 3 queries - loop split union`() {
+        val cfg = AnonGraphReduced();
+        val unionQuery = UnionUsingArrayDotQuery()
+        val splitNodeQuery = SplitCollectionIndexedPairDotQuery()
+        val loopQuery = LoopWithIteratorWithExtraStepsArrayDotQuery()
+        val unionPort_value = unionQuery.ports().find { p -> p.captureGroup().get().contains("value") }
+        val splitPort_input = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("input") }
+        val loopPort_iterator = loopQuery.ports().find { p -> p.captureGroup().get().contains("iterator") }
+
+        val p1 = Pair(unionPort_value, loopPort_iterator)
+        val p2 = Pair(splitPort_input, loopPort_iterator)
+        val matches = uberMatch(cfg, listOf(unionQuery,splitNodeQuery,loopQuery), listOf(p1,p2));
+        val path = "/home/dor/Desktop/PG/dots/uberMatchQueries1/"
+        matches.forEachIndexed { i, m ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, null, m);
 
         }
     }
 
     @Test
-    fun `query test`() {
-        val s = """
-           digraph G {
-  n674421699 [ label="is('LoopBeginNode')" ];
-  n1322240894 [ label="is('ValuePhiNode')" ];
-  n202106861 [ label="(?P<foo>)|is('calc.AddNode')" ];
-  n1969077088 [ label="is('ValueNode')" ];
-  n674421699 -> n1322240894 [ label="(1) = (1)" ];
-  n202106861 -> n1322240894 [ label="(1) = (1)" ];
-  n1322240894 -> n202106861 [ label="(1) = (1)" ];
-  n1969077088 -> n1322240894 [ label="(1) = (1)" ];
-}
-        """.trimIndent()
+    fun `uber match anon algo 5 queries - loop split union func func`() {
         val cfg = AnonGraphReduced();
-        val query = GraphQuery.importQuery(s)
-        val results = query.match(cfg);
-        val f = results[0].keys.find { v -> v.captureGroup() == Optional.of("foo") }
-        println(f)
+        val unionQuery = UnionUsingArrayDotQuery()
+        val splitNodeQuery = SplitCollectionIndexedPairDotQuery()
+        val loopQuery = LoopWithIteratorWithExtraStepsArrayDotQuery()
+        val invoke1Query = FunctionInvokeOneParamQueryDot()
+        val invoke2Query = FunctionInvokeOneParamQueryDot()
+        val unionPort_value = unionQuery.ports().find { p -> p.captureGroup().get().contains("value") }
+        val splitPort_input = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("input") }
+        val splitPort_output1 = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("splitOutput1") }
+        val splitPort_output2 = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("splitOutput2") }
+        val loopPort_iterator = loopQuery.ports().find { p -> p.captureGroup().get().contains("iterator") }
+        val invoke1_param = invoke1Query.ports().find { p -> p.captureGroup().get().contains("invokeInput") }
+        val invoke2_param = invoke2Query.ports().find { p -> p.captureGroup().get().contains("invokeInput") }
+
+        val p1 = Pair(unionPort_value, loopPort_iterator)
+        val p2 = Pair(splitPort_input, loopPort_iterator)
+        val p3 = Pair(splitPort_output1, invoke1_param)
+        val p4 = Pair(splitPort_output2, invoke2_param)
+        val matches = uberMatch(cfg, listOf(unionQuery,splitNodeQuery,loopQuery,invoke1Query,invoke2Query), listOf(p1,p2,p3,p4));
+        val path = "/home/dor/Desktop/PG/dots/uberMatchQueries2/"
+        matches.forEachIndexed { i, m ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, null, m);
+
+        }
     }
+
+    @Test
+    fun `uber match anon algo 6 queries - loop split union func func if `() {
+        val cfg = AnonGraphReduced();
+        val unionQuery = UnionUsingArrayDotQuery()
+        val splitNodeQuery = SplitCollectionIndexedPairDotQuery()
+        val loopQuery = LoopWithIteratorWithExtraStepsArrayDotQuery()
+        val invoke1Query = FunctionInvokeOneParamQueryDot()
+        val invoke2Query = FunctionInvokeOneParamQueryDot()
+        val ifQuery = IfWithConditionQueryDot()
+        val unionPort_value = unionQuery.ports().find { p -> p.captureGroup().get().contains("value") }
+        val splitPort_input = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("input") }
+        val splitPort_output1 = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("splitOutput1") }
+        val splitPort_output2 = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("splitOutput2") }
+        val loopPort_iterator = loopQuery.ports().find { p -> p.captureGroup().get().contains("iterator") }
+        val invoke1_param = invoke1Query.ports().find { p -> p.captureGroup().get().contains("invokeInput") }
+        val invoke2_param = invoke2Query.ports().find { p -> p.captureGroup().get().contains("invokeInput") }
+        val invoke1_output = invoke1Query.ports().find { p -> p.captureGroup().get().contains("invokeOutput") }
+        val invoke2_output = invoke2Query.ports().find { p -> p.captureGroup().get().contains("invokeOutput") }
+        val ifInput1_param = ifQuery.ports().find { p -> p.captureGroup().get().contains("ifInput1") }
+        val ifInput2_param = ifQuery.ports().find { p -> p.captureGroup().get().contains("ifInput2") }
+
+        val pairs = listOf(
+            Pair(unionPort_value, loopPort_iterator),
+            Pair(splitPort_input, loopPort_iterator),
+            Pair(splitPort_output1, invoke1_param),
+            Pair(splitPort_output2, invoke2_param),
+            Pair(ifInput1_param, invoke1_output),
+            Pair(ifInput2_param, invoke2_output),
+        );
+        val matches = uberMatch(cfg, listOf(unionQuery,splitNodeQuery,loopQuery,invoke1Query,invoke2Query,ifQuery), pairs);
+        val path = "/home/dor/Desktop/PG/dots/uberMatchQueries3/"
+        matches.forEachIndexed { i, m ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, null, m);
+
+        }
+    }
+
+
+    @Test
+    fun `uber match anon algo 7 queries - loop split union func func if invoke2`() {
+        val cfg = AnonGraphReduced();
+        val unionQuery = UnionUsingArrayDotQuery()
+        val splitNodeQuery = SplitCollectionIndexedPairDotQuery()
+        val loopQuery = LoopWithIteratorWithExtraStepsArrayDotQuery()
+        val invoke1Query = FunctionInvokeOneParamQueryDot()
+        val invoke2Query = FunctionInvokeOneParamQueryDot()
+        val invokeScopeQuery = FunctionInvokeTwoParamInsideScopeQueryDot()
+//        val invokeScopeQuery = FunctionInvokeTwoParamInsideQueryDot()
+        val ifQuery = IfWithConditionQueryDot()
+        val unionPort_value = unionQuery.ports().find { p -> p.captureGroup().get().contains("value") }
+        val splitPort_input = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("input") }
+        val splitPort_output1 = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("splitOutput1") }
+        val splitPort_output2 = splitNodeQuery.ports().find { p -> p.captureGroup().get().contains("splitOutput2") }
+        val loopPort_iterator = loopQuery.ports().find { p -> p.captureGroup().get().contains("iterator") }
+        val invoke1_param = invoke1Query.ports().find { p -> p.captureGroup().get().contains("invokeInput") }
+        val invoke2_param = invoke2Query.ports().find { p -> p.captureGroup().get().contains("invokeInput") }
+        val invoke1_output = invoke1Query.ports().find { p -> p.captureGroup().get().contains("invokeOutput") }
+        val invoke2_output = invoke2Query.ports().find { p -> p.captureGroup().get().contains("invokeOutput") }
+        val ifInput1_param = ifQuery.ports().find { p -> p.captureGroup().get().contains("ifInput1") }
+        val ifInput2_param = ifQuery.ports().find { p -> p.captureGroup().get().contains("ifInput2") }
+        val if_false = ifQuery.ports().find { p -> p.captureGroup().get().contains("falseSuccessor") }
+        val invokeScopeQuery_scope = ifQuery.ports().find { p -> p.captureGroup().get().contains("scopeBranch") }
+        val invokeScopeQuery_input1 = ifQuery.ports().find { p -> p.captureGroup().get().contains("invokeScopeInput1") }
+//        val invokeScopeQuery_input1 = ifQuery.ports().find { p -> p.captureGroup().get().contains("invoke2Input1") }
+        val invokeScopeQuery_input2 = ifQuery.ports().find { p -> p.captureGroup().get().contains("invokeScopeInput1") }
+//        val invokeScopeQuery_input2 = ifQuery.ports().find { p -> p.captureGroup().get().contains("invoke2Input2") }
+
+        val pairs = listOf(
+            Pair(unionPort_value, loopPort_iterator),
+            Pair(splitPort_input, loopPort_iterator),
+            Pair(splitPort_output1, invoke1_param),
+            Pair(splitPort_output2, invoke2_param),
+            Pair(ifInput1_param, invoke1_output),
+            Pair(ifInput2_param, invoke2_output),
+            Pair(if_false, invokeScopeQuery_scope),
+            Pair(invokeScopeQuery_input1, splitPort_output1),
+            Pair(invokeScopeQuery_input2, splitPort_output2),
+        );
+
+        val queries = listOf(
+            unionQuery,
+            splitNodeQuery,
+            loopQuery,
+            invoke1Query,
+            invoke2Query,
+            ifQuery,
+            invokeScopeQuery
+        );
+        val matches = uberMatch(cfg, queries , pairs);
+        val path = "/home/dor/Desktop/PG/dots/uberMatchQueries4/"
+        matches.forEachIndexed { i, m ->
+            val writer = PrintWriter("$path$i.dot", "UTF-8")
+            cfg.exportQuery(writer, null, m);
+
+        }
+    }
+
 }

@@ -45,13 +45,16 @@ class AlgorithmSample {
         }
         int v1 = 0;
         v2 = 0;
-        while (v1 < field0 - 1) {
+        while (v2 < field1) {
             B v4 = field2[v2++];
-            int v5 = f.f0(v3, v4.field0);
-            int v6 = f.f0(v3, v4.field1);
+            int v4_field0 = v4.field0;
+            int v5 = f.f0(v3, v4_field0);
+            int v4_field1 = v4.field1;
+            int v6 = f.f0(v3, v4_field1);
             if (v5 != v6) {
                 v0[v1++] = v4;
-                f.f1(v3, v5, v6);
+                //f.f1(v3, v5, v6);
+                f.f1(v3, v4_field0, v4_field1);
             }
         }
 //    for (v2 = 0; v2 < v1; ++v2)
