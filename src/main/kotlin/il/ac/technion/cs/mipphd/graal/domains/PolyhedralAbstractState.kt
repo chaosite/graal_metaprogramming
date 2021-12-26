@@ -1,6 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.domains
 
-import apron.*
+/* import apron.*
 import elina.OptPoly
 
 data class Monom(val name: String, val coeff: Coeff)
@@ -62,4 +62,4 @@ class PolyhedralAbstractState(
         val o = if (name in vars) this else declareVariable(name)
         return Pair(o, vars.indexOf(name))
     }
-}
+} */
