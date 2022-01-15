@@ -2,6 +2,7 @@ package il.ac.technion.cs.mipphd.graal.graphquery;
 
 import il.ac.technion.cs.mipphd.graal.MethodToGraph;
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter;
+import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper;
 import org.graalvm.compiler.nodes.*;
 import org.graalvm.compiler.nodes.calc.AddNode;
 import org.graalvm.compiler.nodes.calc.CompareNode;
@@ -113,7 +114,7 @@ public class GraphMaker {
         g.simplify();
         g.removeLoopUnrolls();
         g.removeLeavesRec();
-        g.exportQuery(writer, new ArrayList<>());
+        g.exportQuery(writer, new ArrayList<NodeWrapper>());
         writer.close();
     }
     public static GraalAdapter AnonGraphReduced() throws NoSuchMethodException {
@@ -137,7 +138,7 @@ public class GraphMaker {
                 "  n1309175485 -> n1722105026 [ label=\"is('DATA')\" ];\n" +
                 "  n1722105026 -> n1309175485 [ label=\"is('DATA')\" ];\n" +
                 "}";
-        return GraphQuery.importQuery(s);
+        return GraphQuery.importQuery(s, "Union");
     }
     public static GraphQuery UnionUsingArrayQuery(){
         GraphQuery ret = new GraphQuery();
@@ -194,7 +195,7 @@ public class GraphMaker {
                 "  v4 -> v6 [ label=\"is('DATA')\" ];\n" +
                 "  v7 -> v4 [ label=\"not ((name()) = ('merge'))\" ];\n" +
                 "}";
-        return GraphQuery.importQuery(s);
+        return GraphQuery.importQuery(s, "LoopWithIterator");
     }
     public static GraphQuery LoopWithIteratorWithExtraStepsArrayDotQuery() {
         var s = "digraph G {\n" +
@@ -217,7 +218,7 @@ public class GraphMaker {
                 "  v4 -> v8 [ label=\"name() ='index'\" ]\n" +
                 "  v9 -> v8 [ label=\"name() ='array'\" ]\n" +
                 "}";
-        return GraphQuery.importQuery(s);
+        return GraphQuery.importQuery(s, "LoopWithIterator");
     }
 
     public static GraphQuery LoopWithIteratorWithExtraStepsNoInitDotQuery() {
@@ -322,7 +323,7 @@ public class GraphMaker {
                 "  v4 -> v8 [ label=\"is('DATA')\" ];\n" +
                 "}\n";
 
-        return  GraphQuery.importQuery(s);
+        return  GraphQuery.importQuery(s,"Split");
     }
 
     public static GraphQuery FunctionInvokeOneParamQuery(){
@@ -349,7 +350,7 @@ public class GraphMaker {
                 "  n276649967 -> n1149290751 [ label=\"is('DATA')\" ];\n" +
                 "  n1973339225 -> n1707443639 [ label=\"is('DATA')\" ];\n" +
                 "}";
-        return  GraphQuery.importQuery(s);
+        return  GraphQuery.importQuery(s,"Function Invoke One Param");
     }
 
     public static GraphQuery IfWithConditionQuery(){
@@ -383,7 +384,7 @@ public class GraphMaker {
                 "  n551661064 -> n401012039 [ label=\"is('DATA') and (name() = 'x')\" ];\n" +
                 "  n2060862812 -> n401012039 [ label=\"is('DATA') and (name() = 'y')\" ];\n" +
                 "}\n";
-        return  GraphQuery.importQuery(s);
+        return  GraphQuery.importQuery(s, "If With Condition");
     }
 
     public static GraphQuery FunctionInvokeTwoParamInsideScopeQueryDot(){
@@ -400,7 +401,7 @@ public class GraphMaker {
                 "  n1697913910 -> n687121738 [ label=\"*|is('CONTROL')\" ];\n" +
                 "  n687121738 -> n384996753 [ label=\"is('CONTROL')\" ];\n" +
                 "}";
-        return  GraphQuery.importQuery(s);
+        return  GraphQuery.importQuery(s, "Function Invoke Two Param");
     }
     public static GraphQuery FunctionInvokeTwoParamInsideQueryDot(){
         var s = "digraph G {\n" +
@@ -412,7 +413,7 @@ public class GraphMaker {
                 "  n1433997935 -> n384996753 [ label=\"is('DATA')\" ];\n" +
                 "  n517854861 -> n384996753 [ label=\"is('DATA')\" ];\n" +
                 "}";
-        return  GraphQuery.importQuery(s);
+        return  GraphQuery.importQuery(s, "Function Invoke Two Param");
     }
 
 }

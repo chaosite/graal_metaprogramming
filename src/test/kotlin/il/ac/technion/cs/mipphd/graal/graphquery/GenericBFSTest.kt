@@ -17,6 +17,7 @@ internal class GenericBFSTest {
     @Test
     fun `maximum query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
+
         val query = GraphMaker.createMaxGraph()
         val vertex = query.vertexSet().first()
 

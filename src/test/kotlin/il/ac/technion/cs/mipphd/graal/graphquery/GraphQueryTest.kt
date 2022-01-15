@@ -12,6 +12,9 @@ import java.io.StringReader
 import java.io.StringWriter
 import kotlin.reflect.jvm.javaMethod
 
+import java.util.*
+
+
 val maximumQueryText = """
     digraph G {
       n2021302077 [ label="is('Invoke') and method().name = 'get' and method().className = 'java.util.List'" ];
@@ -175,7 +178,6 @@ internal class GraphQueryTest {
         val path = "/home/dor/Desktop/PG/dots/splitnode/"
         results.forEachIndexed { i, r ->
             val writer = PrintWriter("$path$i.dot", "UTF-8")
-
             cfg.exportQuery(writer, query, r.toMap());
 
         }
@@ -265,7 +267,7 @@ internal class GraphQueryTest {
     @Test
     fun `imported anon graph query func invoke two param`() {
         val cfg = AnonGraphReduced();
-        val query = FunctionInvokeTwoParamInsideQueryDot();
+        val query = FunctionInvokeTwoParamInsideScopeQueryDot();
         val results = query.match(cfg);
         val strwriter = StringWriter()
         query.exportQuery(strwriter)
@@ -289,11 +291,17 @@ internal class GraphQueryTest {
 
         val p1 = Pair(unionPort_value, loopPort_iterator)
         val p2 = Pair(splitPort_input, loopPort_iterator)
+
+        var queries  = listOf(
+            unionQuery,splitNodeQuery,loopQuery
+        );
+
         val matches = uberMatch(cfg, listOf(unionQuery,splitNodeQuery,loopQuery), listOf(p1,p2));
         val path = "/home/dor/Desktop/PG/dots/uberMatchQueries1/"
         matches.forEachIndexed { i, m ->
             val writer = PrintWriter("$path$i.dot", "UTF-8")
-            cfg.exportQuery(writer, null, m);
+            cfg.annotateGraphWithQuery(queries.zip(m.second).toList())
+            cfg.exportQuery(writer, null, m.first);
 
         }
     }
@@ -322,7 +330,7 @@ internal class GraphQueryTest {
         val path = "/home/dor/Desktop/PG/dots/uberMatchQueries2/"
         matches.forEachIndexed { i, m ->
             val writer = PrintWriter("$path$i.dot", "UTF-8")
-            cfg.exportQuery(writer, null, m);
+            cfg.exportQuery(writer, null, m.first);
 
         }
     }
@@ -356,11 +364,14 @@ internal class GraphQueryTest {
             Pair(ifInput1_param, invoke1_output),
             Pair(ifInput2_param, invoke2_output),
         );
-        val matches = uberMatch(cfg, listOf(unionQuery,splitNodeQuery,loopQuery,invoke1Query,invoke2Query,ifQuery), pairs);
+        var queries = listOf(unionQuery,splitNodeQuery,loopQuery,invoke1Query,invoke2Query,ifQuery);
+        val matches = uberMatch(cfg, queries , pairs);
         val path = "/home/dor/Desktop/PG/dots/uberMatchQueries3/"
         matches.forEachIndexed { i, m ->
             val writer = PrintWriter("$path$i.dot", "UTF-8")
-            cfg.exportQuery(writer, null, m);
+            cfg.annotateGraphWithQuery(queries.zip(m.second).toList())
+            cfg.exportQuery(writer, null, m.first);
+            //cfg.exportQuerySubgraph(writer, queries.zip(m.second).toList());
 
         }
     }
@@ -416,11 +427,25 @@ internal class GraphQueryTest {
             ifQuery,
             invokeScopeQuery
         );
+        //val path = "/home/dor/Desktop/PG/dots/queries/"
+        //var j = 0;
+
+//        queries.forEach {
+//            val writer = PrintWriter("$path$j.dot", "UTF-8")
+//            it.exportQuery(writer)
+//            j++
+//        }
         val matches = uberMatch(cfg, queries , pairs);
         val path = "/home/dor/Desktop/PG/dots/uberMatchQueries4/"
         matches.forEachIndexed { i, m ->
             val writer = PrintWriter("$path$i.dot", "UTF-8")
-            cfg.exportQuery(writer, null, m);
+            println("##############   " + i + "   ################")
+            m.second[6].forEach {
+                //print(it.key.toString() + " = ")
+                println(it.value[0])
+            }
+            cfg.exportQuerySubgraph(writer, queries.zip(m.second).toList());
+
 
         }
     }

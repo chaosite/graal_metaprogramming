@@ -5,19 +5,23 @@ import il.ac.technion.cs.mipphd.graal.graphquery.GraphQueryEdge;
 import il.ac.technion.cs.mipphd.graal.graphquery.GraphQueryVertex;
 import kotlin.Pair;
 import org.graalvm.compiler.graph.Node;
+import org.graalvm.compiler.graph.NodeInterface;
 import org.graalvm.compiler.graph.Position;
 import org.graalvm.compiler.nodes.EndNode;
 import org.graalvm.compiler.nodes.LoopEndNode;
 import org.graalvm.compiler.nodes.LoopExitNode;
 import org.graalvm.compiler.nodes.ValuePhiNode;
 import org.graalvm.compiler.nodes.cfg.ControlFlowGraph;
+import org.jetbrains.annotations.NotNull;
 import org.jgrapht.alg.util.Triple;
+import org.jgrapht.graph.AsSubgraph;
 import org.jgrapht.graph.DirectedPseudograph;
 import org.jgrapht.nio.Attribute;
 import org.jgrapht.nio.DefaultAttribute;
 import org.jgrapht.nio.dot.DOTExporter;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -124,6 +128,7 @@ public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> 
         });
         exporter.exportGraph(this, output);
     }
+
     public void exportQuery(Writer output, GraphQuery query, Map<GraphQueryVertex, List<NodeWrapper>> matches) {
 
         DOTExporter<NodeWrapper, EdgeWrapper> exporter =
@@ -140,14 +145,31 @@ public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> 
         exporter.setVertexAttributeProvider(v -> {
             final Map<String, Attribute> attrs = new HashMap<>();
             var label = v.getNode().toString();
+
+            //matched nodes
             if(vmap.containsKey(v)){
-                label += " \n Matched with: " + vmap.get(v).stream().map(qqv -> qqv.label()).reduce((gqv1,gqv2) -> gqv1 + " & " + gqv2);
+//                label += " \n Matched with: " + vmap.get(v).stream().map(qqv -> qqv.label()).reduce((gqv1,gqv2) -> gqv1 + " & " + gqv2);
+                attrs.put("style", DefaultAttribute.createAttribute("filled"));
+                attrs.put("fillcolor", DefaultAttribute.createAttribute("lightgray"));
                 if(vmap.get(v).stream().anyMatch(qqv -> qqv.captureGroup().isPresent())){
-                    attrs.put("style", DefaultAttribute.createAttribute("filled"));
-                    attrs.put("fillcolor", DefaultAttribute.createAttribute("#00ff005f"));
+                    attrs.put("color", DefaultAttribute.createAttribute("#00ff00"));
+                }
+                if(this.outgoingEdgesOf(v).stream().anyMatch(e -> e.label.equals(CONTROL))){
+                    attrs.put("shape", DefaultAttribute.createAttribute("box"));
+                    attrs.put("fillcolor", DefaultAttribute.createAttribute("#ff00005f"));
                 }
             }
+            //non matched none
+            else{
+                attrs.put("style", DefaultAttribute.createAttribute("filled"));
+                attrs.put("fillcolor", DefaultAttribute.createAttribute("#0000009"));
+                attrs.put("color", DefaultAttribute.createAttribute("#000005f"));
+            }
+            //default attr
             attrs.put("label", DefaultAttribute.createAttribute(label));
+
+
+            //return
             if(v.toString().contains("Return")){
                 attrs.put("fillcolor", DefaultAttribute.createAttribute("red"));
                 attrs.put("style", DefaultAttribute.createAttribute("filled"));
@@ -157,32 +179,42 @@ public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> 
 
         exporter.setEdgeAttributeProvider(e -> {
             final Map<String, Attribute> attrs = new HashMap<>();
-            attrs.put("label", DefaultAttribute.createAttribute(e.getName()));
-            attrs.put("color", DefaultAttribute.createAttribute(edgeColor.get(e.getLabel())));
-            attrs.put("style", DefaultAttribute.createAttribute(edgeStyle.get(e.getLabel())));
-            var source = this.getEdgeSource(e);
-            var target = this.getEdgeTarget(e);
-            if(vmap.containsKey(source) && vmap.containsKey(target)){
-                if(query == null){
-                    attrs.put("penwidth", DefaultAttribute.createAttribute(10));
-                }
-                else{
-                    var querySources = vmap.get(source);
-                    var queryTargets = vmap.get(target);
-                    for (GraphQueryVertex querySource : querySources) {
-                        Set<GraphQueryEdge> nexts = query.outgoingEdgesOf(querySource);
+            if(e.name.equals("QueryEdge")){
+                attrs.put("color", DefaultAttribute.createAttribute(e.label));
+                attrs.put("penwidth", DefaultAttribute.createAttribute(50));
+                attrs.put("dir",DefaultAttribute.createAttribute("none"));
+            }
+            else{
+                attrs.put("label", DefaultAttribute.createAttribute(e.getName()));
+                attrs.put("color", DefaultAttribute.createAttribute(edgeColor.get(e.getLabel())));
+                attrs.put("style", DefaultAttribute.createAttribute(edgeStyle.get(e.getLabel())));
+                var source = this.getEdgeSource(e);
+                var target = this.getEdgeTarget(e);
+                if(vmap.containsKey(source) && vmap.containsKey(target)){
+                    if(query == null){
+                        attrs.put("penwidth", DefaultAttribute.createAttribute(1));
+                    }
+                    else{
+                        var querySources = vmap.get(source);
+                        var queryTargets = vmap.get(target);
+                        for (GraphQueryVertex querySource : querySources) {
+                            Set<GraphQueryEdge> nexts = query.outgoingEdgesOf(querySource);
 
-                        var targets = nexts.stream().map(n -> query.getEdgeTarget(n)).collect(Collectors.toList());
-                        if (nexts.stream().map(GraphQueryEdge::label).anyMatch(s -> s.contains("*|"))){
-                            //todo deal somehow with kleene edges
-                            attrs.put("penwidth", DefaultAttribute.createAttribute(10));
-                        }
-                        if(targets.stream().anyMatch(v -> queryTargets.contains(v))){
-                            attrs.put("penwidth", DefaultAttribute.createAttribute(10));
+                            var targets = nexts.stream().map(n -> query.getEdgeTarget(n)).collect(Collectors.toList());
+                            if (nexts.stream().map(GraphQueryEdge::label).anyMatch(s -> s.contains("*|"))){
+                                //todo deal somehow with kleene edges
+                                attrs.put("penwidth", DefaultAttribute.createAttribute(1));
+                            }
+                            if(targets.stream().anyMatch(v -> queryTargets.contains(v))){
+                                attrs.put("penwidth", DefaultAttribute.createAttribute(1));
+                            }
                         }
                     }
-                }
 
+                }
+                else{
+                    attrs.put("penwidth", DefaultAttribute.createAttribute(0.5));
+                }
             }
 
             return attrs;
@@ -299,5 +331,120 @@ public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> 
             }
 
         }
+    }
+
+    public void annotateGraphWithQuery(@NotNull List<Pair<GraphQuery,Map<GraphQueryVertex<? extends NodeInterface>, List<NodeWrapper>>>> stuff) {
+        var colors = Colors().iterator();
+        for (var query_matches : stuff) {
+            var color = colors.next();
+            var query = query_matches.getFirst();
+            var matches = query_matches.getSecond().values().stream().flatMap(Collection::stream).toArray();
+            for(int i = 0; i < matches.length -1 ; i++){
+                var m1 = (NodeWrapper)matches[i];
+                var m2 = (NodeWrapper)matches[i+1];
+                this.addEdge(m1,m2, new EdgeWrapper(color,"QueryEdge"));
+            }
+
+        }
+    }
+
+    public void exportQuerySubgraph(Writer output, @NotNull List<Pair<GraphQuery,Map<GraphQueryVertex<? extends NodeInterface>, List<NodeWrapper>>>> querisMatches) {
+        var clusters = new ArrayList<String>();
+        var subgraphs = new ArrayList<AsSubgraph<NodeWrapper,EdgeWrapper>>();
+        var colors = Colors().iterator();
+        Integer id = 0;
+        for(var queryMatches : querisMatches){
+            var query = queryMatches.getFirst();
+            var ms = queryMatches.getSecond().values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
+            var querySubGraph = new AsSubgraph<NodeWrapper, EdgeWrapper>(this,ms, new HashSet<>());
+            subgraphs.add(querySubGraph);
+            DOTExporter<NodeWrapper, EdgeWrapper> exporter =
+                    new DOTExporter<>(v -> Integer.toString(v.getNode().asNode().getId()));
+            Integer finalId = id;
+            id++;
+            var queryNameValid = query.name.replaceAll("[ ,]","_");
+            exporter.setGraphIdProvider(() -> "cluster_"+queryNameValid+ finalId.toString());
+            exporter.setGraphAttributeProvider(() -> {
+                        final Map<String, Attribute> attrs = new HashMap<>();
+                        attrs.put("label",DefaultAttribute.createAttribute("\"" + queryNameValid + "\""));
+                        attrs.put("style",DefaultAttribute.createAttribute("\"filled\""));
+                        attrs.put("color",DefaultAttribute.createAttribute("\"" +colors.next()+ "\""));
+                        return attrs;
+            }
+            );
+            exporter.setVertexAttributeProvider(v -> {
+                final Map<String, Attribute> attrs = new HashMap<>();
+                var label = v.getNode().toString();
+                //default attr
+                attrs.put("label", DefaultAttribute.createAttribute(label));
+                return attrs;
+            });
+
+
+            var sw = new StringWriter();
+            exporter.exportGraph(querySubGraph,sw);
+            var subGraphDot = sw.toString().replaceFirst("digraph", "subgraph");
+            clusters.add(subGraphDot);
+        }
+
+        DOTExporter<NodeWrapper, EdgeWrapper> exporter =
+                new DOTExporter<>(v -> Integer.toString(v.getNode().asNode().getId()));
+
+        exporter.setVertexAttributeProvider(v -> {
+            final Map<String, Attribute> attrs = new HashMap<>();
+            var label = v.getNode().toString();
+            //default attr
+            attrs.put("label", DefaultAttribute.createAttribute(label));
+            return attrs;
+        });
+
+        exporter.setEdgeAttributeProvider(e -> {
+            final Map<String, Attribute> attrs = new HashMap<>();
+                attrs.put("label", DefaultAttribute.createAttribute(e.getName()));
+                attrs.put("color", DefaultAttribute.createAttribute(edgeColor.get(e.getLabel())));
+                attrs.put("style", DefaultAttribute.createAttribute(edgeStyle.get(e.getLabel())));
+
+                var source = this.getEdgeSource(e);
+                var target = this.getEdgeTarget(e);
+                var querySource = subgraphs.stream().filter(s -> s.containsVertex(source)).collect(Collectors.toUnmodifiableList());
+                var queryTarget = subgraphs.stream().filter(s -> s.containsVertex(target)).collect(Collectors.toUnmodifiableList());
+                if(!querySource.isEmpty() && !queryTarget.isEmpty()){
+                    attrs.put("penwidth", DefaultAttribute.createAttribute(5));
+                }
+            return attrs;
+        });
+
+        var sw = new StringWriter();
+        exporter.exportGraph(this, sw);
+        var clustersString = String.join("\n", clusters);
+        var result = sw.toString().replaceFirst("[{]","{\n" + clustersString);
+        //System.out.println(result);
+        try {
+            output.write(result);
+            output.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static List<String> Colors(){
+        return Arrays.asList(
+                "#ff00005f",
+                "#ff91005f",
+                "#ffe6005f",
+                "#c3ff005f",
+                "#77ff005f",
+                "#00ffd95f",
+                "#f7d5d55f",
+                "#00a6ff5f",
+                "#a600ff5f",
+                "#ff00fb5f",
+                "#a6768e5f",
+                "#6767875f",
+                "#67877f5f",
+                "#7587675f",
+                "#877e675f",
+                "#706d6c5f"
+        );
     }
 }

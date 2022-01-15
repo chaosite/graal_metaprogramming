@@ -10,8 +10,8 @@ fun uberMatch(
     cfg: GraalAdapter,
     queries: List<GraphQuery>,
     connectedPorts: List<Pair<GraphQueryVertex<out NodeInterface>?, GraphQueryVertex<out NodeInterface>?>>
-): MutableList<MutableMap<GraphQueryVertex<out NodeInterface>, MutableList<NodeWrapper>>> {
-    val results = mutableListOf<MutableMap<GraphQueryVertex<out NodeInterface>, MutableList<NodeWrapper>>>();
+): MutableList< Pair<MutableMap<GraphQueryVertex<out NodeInterface>, MutableList<NodeWrapper>>, List<MutableMap<GraphQueryVertex<out NodeInterface>, MutableList<NodeWrapper>>>>> {
+    val results = mutableListOf< Pair<MutableMap<GraphQueryVertex<out NodeInterface>, MutableList<NodeWrapper>>, List<MutableMap<GraphQueryVertex<out NodeInterface>, MutableList<NodeWrapper>>>>>();
     if(queries.size <= 1){
         println("Run query.matchPorts")
         return results;
@@ -28,7 +28,8 @@ fun uberMatch(
             ps.forEach{
                 m.putAll(it)
             }
-            results.add(m)
+
+            results.add(Pair(m,ps))
         }
     }
     return results;

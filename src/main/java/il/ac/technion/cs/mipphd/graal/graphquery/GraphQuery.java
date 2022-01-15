@@ -23,6 +23,7 @@ import java.util.stream.Stream;
 
 
 public class GraphQuery extends DirectedPseudograph<GraphQueryVertex<? extends NodeInterface>, GraphQueryEdge> {
+    public String name;
     public GraphQuery() {
         super(
                 () -> GraphQueryVertexM.fromQuery("1 = 1"),
@@ -151,6 +152,13 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex<? extends N
     public static GraphQuery importQuery(@NonNull String input) {
         return GraphQuery.importQuery(new StringReader(input));
     }
+
+    public static GraphQuery importQuery(@NonNull String input, String name) {
+        GraphQuery graphQuery = GraphQuery.importQuery(new StringReader(input));
+        graphQuery.name = name;
+        return graphQuery;
+    }
+
 
     public List<GraphQueryVertex<? extends  NodeInterface>> ports(){
         return this.vertexSet().stream().filter(v -> v.captureGroup().isPresent()).collect(Collectors.toList());

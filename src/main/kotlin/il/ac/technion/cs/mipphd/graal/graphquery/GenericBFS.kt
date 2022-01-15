@@ -59,7 +59,9 @@ fun singleStep(
     directionToEdgesOfFunction(graph, dir)(graphV)
         .asSequence()
         .filter { e -> queryE.match(graph.getEdgeSource(e), e) }
-        .map(directionToEdgeFunction(graph, dir)).map(::listOf).map { Either.Right(it) }
+        .map() { e -> directionToEdgeFunction(graph, dir)(e) }
+        .map(::listOf)
+        .map { Either.Right(it) }
         .filter { queryW.match(originOrLast(it)) }
         .toList()
 
