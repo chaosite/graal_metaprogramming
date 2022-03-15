@@ -21,26 +21,29 @@ dependencies {
     implementation(kotlin("reflect"))
 
     // ReactiveX
-    implementation("io.reactivex.rxjava3", "rxjava", "3.0.4")
-    implementation("io.reactivex.rxjava3", "rxkotlin", "3.0.0")
+    implementation("io.reactivex.rxjava3:rxjava:3.1.3")
+    implementation("io.reactivex.rxjava3:rxkotlin:3.0.1")
 
     // Arrow (should use sparingly?)
-    implementation("io.arrow-kt", "arrow-core", "0.11.0")
+    implementation("io.arrow-kt:arrow-core:1.0.1")
 
     // Graal
-    implementation("org.graalvm.sdk", "graal-sdk", graalVersion)
-    implementation("org.graalvm.compiler", "compiler", graalVersion)
-    implementation("org.graalvm.tools", "insight", graalVersion)
+    implementation("org.graalvm.sdk:graal-sdk:$graalVersion")
+    implementation("org.graalvm.compiler:compiler:$graalVersion")
+    implementation("org.graalvm.tools:insight:$graalVersion")
 
     // jgrapht
-    implementation("org.jgrapht", "jgrapht-core", jgraphtVersion)
-    implementation("org.jgrapht", "jgrapht-io", jgraphtVersion)
+    implementation("org.jgrapht:jgrapht-core:$jgraphtVersion")
+    implementation("org.jgrapht:jgrapht-io:$jgraphtVersion")
 
     // spotbugs annotations (for @NonNull in Java)
-    implementation("com.github.spotbugs", "spotbugs-annotations", "4.2.0")
+    implementation("com.github.spotbugs:spotbugs-annotations:4.5.3")
 
     // better-parse parser library
-    implementation("com.github.h0tk3y.betterParse", "better-parse","0.4.1")
+    implementation("com.github.h0tk3y.betterParse:better-parse:0.4.3")
+
+    // JSON parser/builder
+    implementation("com.beust:klaxon:5.5")
 
     // Elina
     //implementation(files("libs/gmp.jar", "libs/apron.jar"))
@@ -49,11 +52,11 @@ dependencies {
     //implementation(files("libs/gmp.jar", "libs/apron.jar", "libs/elina.jar"))
     // runtimeOnly(files("libs/gmp.jar", "libs/apron.jar", "libs/elina.jar"))
 
-    testImplementation("org.assertj", "assertj-core", "3.16.1")
-    testImplementation("org.junit.jupiter", "junit-jupiter-api", junitVersion)
-    testImplementation("org.junit.jupiter", "junit-jupiter-engine", junitVersion)
-    testImplementation("org.amshove.kluent", "kluent", "1.65")
-    testImplementation("io.mockk", "mockk", "1.10.5")
+    testImplementation("org.assertj:assertj-core:3.22.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
+    testImplementation("org.amshove.kluent:kluent:1.68")
+    testImplementation("io.mockk:mockk:1.12.2")
 }
 
 val moduleArgs = listOf(
@@ -101,12 +104,12 @@ tasks {
     }
 
     compileKotlin {
-        kotlinOptions.jvmTarget = "1.8"
-        kotlinOptions.freeCompilerArgs = listOf("-nowarn")
+        kotlinOptions.jvmTarget = "17"
+        kotlinOptions.freeCompilerArgs = listOf("-Xextended-compiler-checks")
     }
     compileTestKotlin {
-        kotlinOptions.jvmTarget = "1.8"
-        kotlinOptions.freeCompilerArgs = listOf("-nowarn")
+        kotlinOptions.jvmTarget = "17"
+        kotlinOptions.freeCompilerArgs = listOf("-Xextended-compiler-checks")
     }
 
     test {

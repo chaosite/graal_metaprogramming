@@ -2,10 +2,8 @@ package il.ac.technion.cs.mipphd.graal.utils;
 
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import il.ac.technion.cs.mipphd.graal.MethodToGraph;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
 
-import javax.annotation.Nonnull;
 import java.util.Objects;
 
 /**

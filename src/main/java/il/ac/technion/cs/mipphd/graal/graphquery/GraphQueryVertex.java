@@ -9,12 +9,16 @@ import java.util.function.Predicate;
 public class GraphQueryVertex<T extends NodeInterface> {
     private final Class<T> clazz;
     private Predicate<NodeInterface> predicate;
+    private String name = "n" + this.hashCode();
 
     @SuppressWarnings("unchecked")
     public GraphQueryVertex(Class<T> clazz, Predicate<T> predicate) {
         this.clazz = clazz;
         this.predicate = (Predicate<NodeInterface>) predicate;
     }
+
+    public void setName(String name) { this.name = name; }
+    public String getName() { return name; }
 
     public Class<T> getClazz() {
         return clazz;

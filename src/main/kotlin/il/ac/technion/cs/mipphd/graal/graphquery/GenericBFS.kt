@@ -46,7 +46,7 @@ fun possibleChildrenMatches(query: GraphQuery, graph: GraalAdapter, queryV: Grap
 
 private fun originOrLast(it: MatchedNodes): NodeWrapper =
     when (it) {
-        is Either.Left -> it.a; is Either.Right -> it.b.last()
+        is Either.Left -> it.value; is Either.Right -> it.value.last()
     }
 
 fun singleStep(
@@ -169,7 +169,7 @@ fun bfsMatch(
             fullMatches.add(matches.mapValues { (_, v) ->
                 when (v) {
                     is Either.Left -> listOf()
-                    is Either.Right -> v.b
+                    is Either.Right -> v.value
                 }
             })
             continue

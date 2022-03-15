@@ -1,7 +1,7 @@
 package il.ac.technion.cs.mipphd.graal.domains
 
 import il.ac.technion.cs.mipphd.graal.ForwardsAnalysis
-import il.ac.technion.cs.mipphd.graal.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import il.ac.technion.cs.mipphd.graal.graphquery.GraphQueryVertexM
 import il.ac.technion.cs.mipphd.graal.utils.*
 import org.junit.jupiter.api.Assertions.*

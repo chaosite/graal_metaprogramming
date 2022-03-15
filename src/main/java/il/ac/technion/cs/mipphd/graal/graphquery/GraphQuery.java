@@ -75,7 +75,7 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex<? extends N
 
     public void exportQuery(Writer output) {
         DOTExporter<GraphQueryVertex<? extends NodeInterface>, GraphQueryEdge> exporter =
-                new DOTExporter<>(v -> "n" + v.hashCode());
+                new DOTExporter<>(v -> v.getName() );
 
         exporter.setVertexAttributeProvider(v -> {
             final Map<String, Attribute> attrs = new HashMap<>();
@@ -95,7 +95,7 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex<? extends N
     public static GraphQuery importQuery(@NonNull Reader input) {
         GraphQuery ret = new GraphQuery();
         DOTImporter<GraphQueryVertex<? extends NodeInterface>, GraphQueryEdge> importer = new DOTImporter<>();
-        importer.setVertexFactory(s -> GraphQueryVertexM.fromQuery("1 = 1"));
+        importer.setVertexFactory(GraphQueryVertexM::fromName);
         importer.addVertexAttributeConsumer(((p, a) -> {
             if (p.getSecond().equals("label")) {
                 GraphQueryVertexM v = (GraphQueryVertexM) p.getFirst();

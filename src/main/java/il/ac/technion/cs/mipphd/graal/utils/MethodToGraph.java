@@ -1,6 +1,7 @@
-package il.ac.technion.cs.mipphd.graal;
+package il.ac.technion.cs.mipphd.graal.utils;
 
 import il.ac.technion.cs.mipphd.graal.utils.CFGWrapper;
+import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter;
 import il.ac.technion.cs.mipphd.graal.utils.MethodWrapper;
 import jdk.vm.ci.meta.MetaAccessProvider;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
@@ -93,6 +94,10 @@ public class MethodToGraph {
             System.out.println();
             System.out.println(block.toString(Verbosity.All));
         }
+    }
+
+    public GraalAdapter getAdaptedCFG(Method method) {
+        return GraalAdapter.fromGraal(getCFG(method));
     }
 
     static private GraalRuntime initializeRuntime() {

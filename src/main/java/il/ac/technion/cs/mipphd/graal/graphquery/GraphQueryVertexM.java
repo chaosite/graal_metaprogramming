@@ -22,6 +22,13 @@ public class GraphQueryVertexM extends GraphQueryVertex<Node> {
     }
 
     @NonNull
+    public static GraphQueryVertexM fromName(@NonNull String name) {
+        GraphQueryVertexM v = fromQuery("1 = 1");
+        v.setName(name);
+        return v;
+    }
+
+    @NonNull
     public MQuery getMQuery() {
         return mQuery;
     }

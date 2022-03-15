@@ -1,6 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.multifunction
 
-import il.ac.technion.cs.mipphd.graal.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import il.ac.technion.cs.mipphd.graal.graphquery.GraphQuery
 import il.ac.technion.cs.mipphd.graal.graphquery.GraphQueryVertex

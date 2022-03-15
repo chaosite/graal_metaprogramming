@@ -1,7 +1,7 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.Listable
-import il.ac.technion.cs.mipphd.graal.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapperUtils
 import io.mockk.impl.annotations.RelaxedMockK

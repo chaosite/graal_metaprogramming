@@ -2,13 +2,12 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.Listable
-import il.ac.technion.cs.mipphd.graal.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import org.graalvm.compiler.nodes.PhiNode
 import org.graalvm.compiler.nodes.ValuePhiNode
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import kotlin.reflect.jvm.javaMethod
-import kotlin.streams.toList
 
 internal class GenericBFSTest {
     private val methodToGraph = MethodToGraph()

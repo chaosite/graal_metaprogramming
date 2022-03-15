@@ -1,7 +1,7 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.Listable
-import il.ac.technion.cs.mipphd.graal.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import org.graalvm.compiler.graph.NodeInterface
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
