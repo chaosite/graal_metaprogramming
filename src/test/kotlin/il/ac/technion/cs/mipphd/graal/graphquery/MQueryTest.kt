@@ -7,6 +7,7 @@ import il.ac.technion.cs.mipphd.graal.utils.NodeWrapperUtils
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit5.MockKExtension
 import org.amshove.kluent.*
+import org.graalvm.compiler.graph.Node
 import org.graalvm.compiler.nodes.Invoke
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -192,7 +193,7 @@ internal class MQueryTest {
         private val methodToGraph = MethodToGraph()
         private val maximum = Listable::maximum.javaMethod
         private val maximumGraph = methodToGraph.getCFG(maximum)
-        private val invokeNode = NodeWrapper(maximumGraph.asCFG().graph.nodes.filterIsInstance<Invoke>()[0])
+        private val invokeNode = NodeWrapper(maximumGraph.asCFG().graph.nodes.filterIsInstance<Invoke>()[0] as Node)
         private val invokeQueryTarget = QueryTargetNode(invokeNode)
 
         @Test

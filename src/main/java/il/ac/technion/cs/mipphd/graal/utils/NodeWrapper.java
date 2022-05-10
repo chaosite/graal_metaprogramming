@@ -2,14 +2,14 @@ package il.ac.technion.cs.mipphd.graal.utils;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.graalvm.compiler.graph.NodeInterface;
+import org.graalvm.compiler.graph.Node;
 
 import java.util.List;
 
 public class NodeWrapper {
-    private final NodeInterface node;
+    private final Node node;
 
-    public NodeWrapper(NodeInterface node) {
+    public NodeWrapper(Node node) {
         this.node = node;
     }
 
@@ -29,7 +29,7 @@ public class NodeWrapper {
         return new HashCodeBuilder(17, 37).append(node).toHashCode();
     }
 
-    public NodeInterface getNode() {
+    public Node getNode() {
         return node;
     }
 
@@ -51,6 +51,6 @@ public class NodeWrapper {
     }
 
     public int getId() {
-        return this.node.asNode().getId();
+        return this.node.getId();
     }
 }

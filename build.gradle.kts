@@ -12,7 +12,7 @@ allprojects {
     }
 }
 
-val graalVersion = "21.3.0"
+val graalVersion = "22.1.0"
 val jgraphtVersion = "1.5.1"
 val junitVersion = "5.8.2"
 
@@ -21,11 +21,11 @@ dependencies {
     implementation(kotlin("reflect"))
 
     // ReactiveX
-    implementation("io.reactivex.rxjava3:rxjava:3.1.3")
+    implementation("io.reactivex.rxjava3:rxjava:3.1.4")
     implementation("io.reactivex.rxjava3:rxkotlin:3.0.1")
 
     // Arrow (should use sparingly?)
-    implementation("io.arrow-kt:arrow-core:1.0.1")
+    implementation("io.arrow-kt:arrow-core:1.1.2")
 
     // Graal
     implementation("org.graalvm.sdk:graal-sdk:$graalVersion")
@@ -37,13 +37,13 @@ dependencies {
     implementation("org.jgrapht:jgrapht-io:$jgraphtVersion")
 
     // spotbugs annotations (for @NonNull in Java)
-    implementation("com.github.spotbugs:spotbugs-annotations:4.5.3")
+    implementation("com.github.spotbugs:spotbugs-annotations:4.6.0")
 
     // better-parse parser library
-    implementation("com.github.h0tk3y.betterParse:better-parse:0.4.3")
+    implementation("com.github.h0tk3y.betterParse:better-parse:0.4.4")
 
     // JSON parser/builder
-    implementation("com.beust:klaxon:5.5")
+    implementation("com.beust:klaxon:5.6")
 
     // Elina
     //implementation(files("libs/gmp.jar", "libs/apron.jar"))
@@ -56,7 +56,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
     testImplementation("org.amshove.kluent:kluent:1.68")
-    testImplementation("io.mockk:mockk:1.12.2")
+    testImplementation("io.mockk:mockk:1.12.3")
 }
 
 val moduleArgs = listOf(

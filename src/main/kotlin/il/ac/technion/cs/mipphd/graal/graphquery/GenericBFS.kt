@@ -3,7 +3,6 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 import arrow.core.Either
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
-import org.graalvm.compiler.graph.NodeInterface
 import org.jgrapht.Graph
 import org.jgrapht.GraphTests
 
@@ -15,7 +14,7 @@ enum class Direction {
 typealias MatchedNodes = Either<NodeWrapper, List<NodeWrapper>>
 
 fun possibleChildrenMatches(query: GraphQuery, graph: GraalAdapter, queryV: GraphQueryVertex<*>, graphV: NodeWrapper):
-        List<Map<GraphQueryVertex<out NodeInterface>, List<MatchedNodes>>> =
+        List<Map<GraphQueryVertex<*>, List<MatchedNodes>>> =
     listOf(query.edgesOf(queryV).mapNotNull { qe ->
         val dir = if (query.getEdgeSource(qe) == queryV) Direction.FORWARDS else Direction.BACKWARDS
         val queryW = directionToEdgeFunction(query, dir)(qe)

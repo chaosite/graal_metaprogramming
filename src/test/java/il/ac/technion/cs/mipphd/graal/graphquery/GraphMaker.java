@@ -7,7 +7,7 @@ public class GraphMaker {
     public static GraphQuery createMaxGraph() {
         GraphQuery ret = new GraphQuery();
 
-        GraphQueryVertex<Invoke> get = ret.addVertex(Invoke.class,
+        GraphQueryVertex<InvokeNode> get = ret.addVertex(InvokeNode.class,
                 invoke -> invoke.getTargetMethod().getDeclaringClass().toJavaName(true).equals("java.util.List") && invoke.getTargetMethod().getName().equals("get"));
         GraphQueryVertex<ValueNode> getKleene = ret.addVertex(ValueNode.class);
         GraphQueryVertex<ConditionalNode> conditional = ret.addVertex(ConditionalNode.class);
@@ -30,7 +30,7 @@ public class GraphMaker {
     public static GraphQuery createMinimalQuery() {
         GraphQuery ret = new GraphQuery();
 
-        ret.addVertex(Invoke.class,
+        ret.addVertex(InvokeNode.class,
                 invoke -> invoke.getTargetMethod().getDeclaringClass().toJavaName(true).equals("java.util.List") && invoke.getTargetMethod().getName().equals("get"));
         return ret;
     }
@@ -51,7 +51,7 @@ public class GraphMaker {
     public static GraphQuery createMinimalKleeneQuery() {
         GraphQuery ret = new GraphQuery();
 
-        GraphQueryVertex<Invoke> get = ret.addVertex(Invoke.class,
+        GraphQueryVertex<InvokeNode> get = ret.addVertex(InvokeNode.class,
                 invoke -> invoke.getTargetMethod().getDeclaringClass().toJavaName(true).equals("java.util.List") && invoke.getTargetMethod().getName().equals("get"));
         GraphQueryVertex<ValueNode> getKleene = ret.addVertex(ValueNode.class);
         GraphQueryVertex<ConditionalNode> conditional = ret.addVertex(ConditionalNode.class);

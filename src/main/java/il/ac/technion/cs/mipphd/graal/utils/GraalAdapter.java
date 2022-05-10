@@ -85,7 +85,7 @@ public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> 
 
     public void exportQuery(Writer output) {
         DOTExporter<NodeWrapper, EdgeWrapper> exporter =
-                new DOTExporter<>(v -> Integer.toString(v.getNode().asNode().getId()));
+                new DOTExporter<>(v -> Integer.toString(v.getNode().getId()));
 
         exporter.setVertexAttributeProvider(v -> {
             final Map<String, Attribute> attrs = new HashMap<>();

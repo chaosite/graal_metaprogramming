@@ -2,7 +2,6 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.Listable
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
-import org.graalvm.compiler.graph.NodeInterface
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -110,7 +109,7 @@ internal class GraphQueryTest {
 
         val set = mutableSetOf(*cfg.asCFG().graph.nodes.toList().toTypedArray())
         query.vertexSet().forEach { queryNode ->
-            assertTrue(set.any { (queryNode as GraphQueryVertex<NodeInterface>).match(it) }, "Couldn't find $queryNode")
+            assertTrue(set.any { (queryNode as GraphQueryVertex<*>).match(it) }, "Couldn't find $queryNode")
         }
         assertEquals(18, query.match(cfg).size)
     }

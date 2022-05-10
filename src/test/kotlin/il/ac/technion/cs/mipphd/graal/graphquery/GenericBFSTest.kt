@@ -88,7 +88,7 @@ internal class GenericBFSTest {
         val queryReturnKleene = query.getEdgeTarget(query.outgoingEdgesOf(queryReturnPhi).last())
         val adaptedCfg = GraalAdapter.fromGraal(cfg)
         val graphReturnPhi = adaptedCfg.vertexSet().stream()
-            .filter { it.node.asNode().javaClass == ValuePhiNode::class.java }
+            .filter { it.node.javaClass == ValuePhiNode::class.java }
             .toList()
             .last()
         val result = possibleChildrenMatches(query, adaptedCfg, queryReturnPhi, graphReturnPhi)

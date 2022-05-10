@@ -43,7 +43,6 @@ public class MethodToGraph {
         return graphBuilder
                 .method(method)
                 .compilationId(backend.getCompilationIdentifier(method))
-                .useProfilingInfo(false)
                 .build();
     }
 

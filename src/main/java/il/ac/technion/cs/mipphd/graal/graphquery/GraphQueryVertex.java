@@ -1,20 +1,20 @@
 package il.ac.technion.cs.mipphd.graal.graphquery;
 
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper;
-import org.graalvm.compiler.graph.NodeInterface;
+import org.graalvm.compiler.graph.Node;
 
 import java.util.Optional;
 import java.util.function.Predicate;
 
-public class GraphQueryVertex<T extends NodeInterface> {
+public class GraphQueryVertex<T extends Node> {
     private final Class<T> clazz;
-    private Predicate<NodeInterface> predicate;
+    private Predicate<Node> predicate;
     private String name = "n" + this.hashCode();
 
     @SuppressWarnings("unchecked")
     public GraphQueryVertex(Class<T> clazz, Predicate<T> predicate) {
         this.clazz = clazz;
-        this.predicate = (Predicate<NodeInterface>) predicate;
+        this.predicate = (Predicate<Node>) predicate;
     }
 
     public void setName(String name) { this.name = name; }
@@ -25,11 +25,11 @@ public class GraphQueryVertex<T extends NodeInterface> {
     }
 
     @SuppressWarnings("unchecked")
-    public void setPredicate(Predicate<? extends NodeInterface> predicate) {
-        this.predicate = (Predicate<NodeInterface>) predicate;
+    public void setPredicate(Predicate<? extends Node> predicate) {
+        this.predicate = (Predicate<Node>) predicate;
     }
 
-    public boolean match(NodeInterface value) {
+    public boolean match(Node value) {
         if (this.clazz.isAssignableFrom(value.getClass())) {
             return this.predicate.test(value);
         }
