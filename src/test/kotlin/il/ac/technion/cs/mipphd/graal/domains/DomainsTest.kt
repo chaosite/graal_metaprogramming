@@ -1,10 +1,11 @@
 package il.ac.technion.cs.mipphd.graal.domains
 
 import il.ac.technion.cs.mipphd.graal.ForwardsAnalysis
-import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import il.ac.technion.cs.mipphd.graal.graphquery.GraphQueryVertexM
-import il.ac.technion.cs.mipphd.graal.utils.*
-import org.junit.jupiter.api.Assertions.*
+import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
+import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -41,8 +42,8 @@ internal class DomainsTest {
             val executor = McCarthy91Analysis(graph)
 
             val results = executor.iterateUntilFixedPoint()
-
-            for ((_, item) in results) {
+            val items = results.toList().asSequence().sortedBy { it.first.id }.map { it.second }
+            for (item in items) {
                 if (item.statements.isNotEmpty())
                     println(item.statements)
             }

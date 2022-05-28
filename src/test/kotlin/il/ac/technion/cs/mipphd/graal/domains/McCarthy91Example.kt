@@ -7,6 +7,7 @@ import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapperUtils
 import il.ac.technion.cs.mipphd.graal.utils.PhiEdgeWrapper
+import java.util.SortedSet
 
 fun mccarthy91(l: Long): Long {
     var n = l
@@ -28,6 +29,7 @@ data class Item(
     val statements: String = "",
     val condition: String = "",
     val relatedValues: List<NodeWrapper> = listOf(),
+    val nextIds: Set<Int> = setOf(),
     val mergeValues: Map<NodeWrapper, Map<NodeWrapper, NodeWrapper>> = mapOf()
 ) {
     companion object {
@@ -77,6 +79,16 @@ digraph G {
 
     val valuephi: CaptureGroupAction<Item> by { nodes: List<NodeWrapper> ->
         Item(expression = "phi${nodes.first().id}")
+    }
+
+    val valueProxyQuery by """
+        digraph G {
+            valueProxy [ label = "(?P<valueProxy>)|is('ValueProxyNode')" ];
+        }
+    """.trimIndent()
+
+    val valueProxy: CaptureGroupAction<Item> by { nodes: List<NodeWrapper> ->
+        Item(expression = "proxy${nodes.first().id}")
     }
 
     val parameterQuery by """
@@ -144,8 +156,6 @@ digraph G {
         val values = captureGroups.getValue("phivalues")
         val sourceValues = captureGroups.getValue("phisourcevalues")
 
-        println(captureGroups)
-
         val map = mutableMapOf<NodeWrapper, MutableMap<NodeWrapper, NodeWrapper>>()
         for (phi in values) {
             for (value in sourceValues) {
@@ -158,7 +168,6 @@ digraph G {
                 }
             }
         }
-        println(map)
         state[mergeNode] = state.getValue(mergeNode).copy(relatedValues = values, mergeValues = map)
     }
 
@@ -187,22 +196,43 @@ digraph G {
             .joinToString(" && ")
 
         val values =
-            state[begin]!!.mergeValues.let { it[end] ?: it[prev] }!!.entries.joinToString("\n") { (phi, valueNode) ->
+            state[begin]?.mergeValues?.let { it[end] ?: it[prev] }?.entries?.joinToString("\n") { (phi, valueNode) ->
                 "${state.getValue(phi).expression} := ${state.getValue(valueNode).expression}"
-            }
+            } ?: ""
 
         // Make the text thing
         state[end] = state.getValue(end).copy(
             statements = """
 ${end.id}:
-   assume $condition
-${values.prependIndent("   ")}
-   goto ${begin.id}
+    assume $condition
+${values.prependIndent("    ")}
+    goto ${begin.id}
 """.trimIndent()
         )
     }
 
-    val mergeNodeQuery by """
+    val loopBeginQuery by """
+digraph G {
+        loopBegin [ label="(?P<begin>)|is('LoopBeginNode')" ];
+        loopEnd [ label="[](?P<end>)|is('LoopEndNode') or is('LoopExitNode')" ];
+        
+        loopBegin -> loopEnd [ label="is('ASSOCIATED')" ];
+}
+    """.trimIndent()
+
+    val loopBeginQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+        val begin = captureGroups.getValue("begin").first()
+        val ends = captureGroups.getValue("end")
+
+        state[begin] = state[begin]!!.copy(
+            statements = """
+            ${begin.id}:
+                goto ${ends.joinToString(", ") { it.id.toString() }}
+        """.trimIndent()
+        )
+    }
+
+    val mergePathQuery by """
 digraph G {
     mergeBegin [ label="(?P<mergeBegin>)|is('StartNode') or is('AbstractMergeNode') or is('LoopExitNode')" ];
     someNode [ label="(?P<mergePath>)|not is('AbstractMergeNode') and not is ('ReturnNode') and not is('LoopEndNode') and not is ('LoopExitNode')" ];
@@ -213,24 +243,62 @@ digraph G {
 }
     """
 
-    val mergeNodeQueryAction: WholeMatchAction by { captureGroupActions: Map<String, List<NodeWrapper>> ->
-        val begin = captureGroupActions["mergeBegin"]!!.first()
-        val end = captureGroupActions["mergeEnd"]!!.first()
-        val nodes = listOf(begin) + captureGroupActions["mergePath"]!!
+    val mergePathQueryAction: WholeMatchAction by { captureGroupActions: Map<String, List<NodeWrapper>> ->
+        val begin = captureGroupActions.getValue("mergeBegin").first()
+        val end = captureGroupActions.getValue("mergeEnd").first()
+        val nodes = listOf(begin) + captureGroupActions.getValue("mergePath")
+        val lastNode = nodes.last()
 
         val condition = nodes.asSequence().map(state::getValue).map(Item::condition).filter(String::isNotEmpty)
             .joinToString(" && ")
-
-
         val values =
-            state[end]!!.mergeValues[nodes.last()]?.entries?.joinToString("\n") { (phi, valueNode) ->
+            state.getValue(end).mergeValues[nodes.last()]?.entries?.joinToString("\n") { (phi, valueNode) ->
                 "${state.getValue(phi).expression} := ${state.getValue(valueNode).expression}"
-            }
+            } ?: ""
+        val nextIds =
+            state.getValue(begin).nextIds + lastNode.id
 
-        println(nodes.hashCode())
-        println(nodes.last())
-        println(state[end]!!.mergeValues)
-        println(condition)
-        println(values)
+        state[begin] = state.getValue(begin).copy(
+            nextIds = nextIds, statements = """
+            ${begin.id}:
+                ${nextIds.joinToString(", ", "goto ") { it.toString() }}
+        """.trimIndent()
+        )
+        if (condition.isNotEmpty())
+            state[lastNode] = state.getValue(lastNode).copy(
+                statements = """
+                ${lastNode.id}:
+                    assume $condition
+                    $values
+                    goto ${end.id}
+            """.trimIndent()
+            )
+        else
+            state[lastNode] = state.getValue(lastNode).copy(
+                statements = """
+                ${lastNode.id}:
+                    $values
+                    goto ${end.id}
+            """.trimIndent()
+            )
+    }
+
+    val returnNodeQuery by """
+digraph G {
+    r [ label = "(?P<returnNode>)|is('ReturnNode')" ];
+    v [ label = "(?P<value>)|1 = 1" ];
+    
+    v -> r [ label = "is('DATA')" ];
+}
+    """
+
+    val returnNodeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+        val returnNode = captureGroups.getValue("returnNode").first()
+        val value = captureGroups.getValue("value").first()
+
+        state[returnNode] = state.getValue(returnNode).copy(statements = """
+            ${returnNode.id}:
+                return ${state.getValue(value).expression}
+        """.trimIndent())
     }
 }
