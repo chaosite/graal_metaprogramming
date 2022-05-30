@@ -125,6 +125,15 @@ public class GraphMaker {
         g.removeLeavesRec();
         return g;
     }
+
+    public static GraalAdapter Kruskal1GraphReduced() throws NoSuchMethodException {
+        var methodToGraph = new MethodToGraph();
+        var g = GraalAdapter.fromGraal(methodToGraph.getCFG(Kruskal1.class.getMethod("KruskalMST" )));
+        g.simplify();
+        g.removeLoopUnrolls();
+        g.removeLeavesRec();
+        return g;
+    }
     public static GraphQuery UnionUsingArrayDotQuery(){
         var s = "digraph G {\n" +
                 "  n1747810414 [ label=\"is('java.StoreIndexedNode')\" ];\n" +

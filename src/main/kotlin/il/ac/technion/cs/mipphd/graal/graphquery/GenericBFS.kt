@@ -55,15 +55,21 @@ fun singleStep(
     queryW: GraphQueryVertex<*>,
     graphV: NodeWrapper,
     dir: Direction,
-): List<MatchedNodes> =
-    directionToEdgesOfFunction(graph, dir)(graphV)
+): List<MatchedNodes> {
+
+
+    val r = directionToEdgesOfFunction(graph, dir)(graphV)
         .asSequence()
         .filter { e -> queryE.match(graph.getEdgeSource(e), e) }
-        .map() { e -> directionToEdgeFunction(graph, dir)(e) }
+        .map() { e ->
+            directionToEdgeFunction(graph, dir)(e)
+        }
         .map(::listOf)
         .map { Either.Right(it) }
         .filter { queryW.match(originOrLast(it)) }
         .toList()
+    return r
+}
 
 private fun <V, E> directionToEdgesOfFunction(graph: Graph<V, E>, dir: Direction) = when (dir) {
     Direction.FORWARDS -> graph::outgoingEdgesOf
