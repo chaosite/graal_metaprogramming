@@ -64,6 +64,7 @@ val moduleArgs = listOf(
     "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED,jdk.internal.vm.compiler",
     "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.services=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.runtime=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.api.runtime=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.debug=ALL-UNNAMED",
@@ -80,11 +81,11 @@ val moduleArgs = listOf(
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.graphbuilderconf=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.java=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.memory=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.memory.address=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.phases.common=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.java=ALL-UNNAMED",
-    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.graph.iterators=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.calc=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.spi=ALL-UNNAMED",
@@ -114,7 +115,7 @@ tasks {
 
     test {
         useJUnitPlatform()
-        jvmArgs = moduleArgs
+        jvmArgs = moduleArgs + listOf("-Ddebug.graal.TrackNodeCreationPosition=true", "--add-opens", "jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED",)
         maxHeapSize = "8g"
         systemProperty("java.library.path", "/usr/local/lib")
     }
