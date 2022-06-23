@@ -1,0 +1,273 @@
+package il.ac.technion.cs.mipphd.graal.graphquery
+
+import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
+import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
+import org.graalvm.compiler.graph.Node
+import org.graalvm.compiler.nodes.ValueNode
+import org.graalvm.compiler.nodes.java.LoadFieldNode
+import org.graalvm.compiler.nodes.java.StoreFieldNode
+import org.graalvm.compiler.nodes.virtual.VirtualInstanceNode
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import java.io.File
+import java.io.StringWriter
+import java.lang.reflect.Field
+import java.lang.reflect.Modifier
+import kotlin.random.Random
+import kotlin.reflect.jvm.javaMethod
+
+//data class A(val num: Int, val id: Int = 0) {
+//    init {
+//        println("test")
+//    }
+//
+//}
+
+fun f2(a: A?) {
+    println(a?.num)
+}
+// query for all allocation sites (like mccarthy 91)
+// find reads and writes (data edge)
+
+fun one() = 1
+fun two() = 2
+fun fib(n: Int): Int = if (n in 1..2) 1 else fib(n - 1) + fib(n - 2)
+
+
+val a1 = A(5)
+val a2 = A(3)
+val rng = Random.Default
+
+data class Box(val a: A)
+
+fun exampleFun(num1: Int, num2: Int): Boolean {
+    val a1 = A(num1)
+    val a2 = A(num2)
+    val b = Box(a2)
+    if (a1.num > b.a.num) {
+        print("A")
+        return true
+    } else {
+        print("B")
+        return false
+    }
+}
+
+fun part1(x: Int, y: Int): Pair<Box, Box> {
+    return Box(A(x)) to Box(A(y))
+}
+
+fun part2(b1: Box, b2: Box) {
+    if (b1.a.num < b2.a.num) {
+        //
+    } else {
+        //
+    }
+}
+
+fun complete(f1: (Int, Int) -> Pair<Box, Box>, f2: (Box, Box) -> Unit, x: Int, y: Int) {
+    val (box1, box2) = f1(x, y)
+    f2(box1, box2)
+}
+
+@Suppress("SimplifyBooleanWithConstants", "KotlinConstantConditions")
+fun f1(l: MutableSet<Any>, num: Int): Int {
+    val a1 = A(num)
+    l.add(java.util.ArrayList<Int>())
+    l.add(a1.num)
+    l.add(a1)
+//    val a2 = A(3)
+//    if(fib(-1) == 5) {
+//        f2(a1)
+//        A(3)
+//        return one()
+//    } else {
+//        f2(a2)
+//        return two()
+//    }
+//    if(rng.nextBoolean()) {
+//        f2(a1)
+//    } else {
+//        f2(a2)
+//    }
+//    f2(a1)
+    return 0
+}
+
+// notes:
+// allocations don't seem to work with CFG generators?
+// graal is very smart in optimizations: only allocating things that are actually used and simplifying redundant
+// expressions, even calling functions like fib() and of course functions like one() and two()
+// getting it to actually generate a function call here required using values for which fib does not terminate
+// values for which fib does terminate get translated to the actual result for fib
+// this works in all circumstances where values are used (both in return values and in "if")
+// also, constructors get inlined
+// what is "Deopt" for a node? it's created all the time instead of actual code in many cases as simple as "f2(a1)"
+// receiving parameters that are objects incurs a large overhead of nodes because of kotlin null-safety boilerplate
+
+
+val forceAllocSet = mutableSetOf<Any?>()
+fun allocatingFunction(x: Int, y: Int, z: Int) {
+    val a = A(x)
+    val b = A(y)
+    val c = A(z)
+    println(a.num)
+    println(b.num)
+    println(c.num)
+    forceAllocSet.add(a)
+    forceAllocSet.add(b)
+    forceAllocSet.add(c)
+}
+
+//fun accessingFunction(a: A, b: A, c: A) {
+//    val num1 = a.num
+//    val num2 = b.num
+//    val num3 = c.num
+//}
+
+internal class PointsToAnalysis {
+    init {
+//        val field = Class.forName("org.graalvm.compiler.graph.Node").getField("TRACK_CREATION_POSITION")
+//        field.isAccessible = true
+//        val modifiersField = Field::class.java.getDeclaredField("modifiers")
+//        modifiersField.isAccessible = true
+//        modifiersField.setInt(field, field.modifiers and Modifier.FINAL.inv())
+//        field.set(null, true);
+    }
+
+    @Nested
+    @DisplayName("PointsToAnalysis")
+    inner class PointsToAnalysisTests {
+        private val firstMethod = ::f1.javaMethod
+        private val secondMethod = ::f2.javaMethod
+        private val methodToGraph = MethodToGraph()
+
+        @Test
+        fun `print f1 f2 graphs`() {
+            println("----f1----")
+            var cfg = methodToGraph.getCFG(::f1.javaMethod)
+            var adapted = GraalAdapter.fromGraal(cfg)
+
+            var sw = StringWriter()
+            adapted.exportQuery(sw)
+
+            println(sw.buffer)
+            val f = File("out.dot")
+            f.writeText(sw.buffer.toString())
+            println("----f2----")
+            cfg = methodToGraph.getCFG(secondMethod)
+            adapted = GraalAdapter.fromGraal(cfg)
+            sw = StringWriter()
+            adapted.exportQuery(sw)
+
+            println(sw.buffer)
+            assertTrue(true)
+        }
+
+        @Test
+        fun `print allocatingFunction graphs`() {
+            val cfg = methodToGraph.getCFG(::allocatingFunction.javaMethod)
+            val adapted = GraalAdapter.fromGraal(cfg)
+
+            val sw = StringWriter()
+            adapted.exportQuery(sw)
+
+            println(sw.buffer)
+        }
+
+        @Test
+        fun `get alloc nodes via graph executor`() {
+            println(Node.TRACK_CREATION_POSITION)
+            val cfg = methodToGraph.getCFG(::allocatingFunction.javaMethod)
+            val graph = GraalAdapter.fromGraal(cfg)
+            val analyzer = object : QueryExecutor<String>(graph, { "" }) {
+                val virtualQuery by """
+digraph G {
+    n [ label="(?P<virtual>)|is('virtual.VirtualInstanceNode')" ];
+}
+"""
+                val virtual: CaptureGroupAction<String> by { nodes: List<NodeWrapper> ->
+                    val node = nodes.first()
+                    (node.node as VirtualInstanceNode).creationPosition.toString()// objectId.toString() // object ID from cfg
+                }
+            }
+            val results = analyzer.iterateUntilFixedPoint()
+            val items = results.toList().asSequence().sortedBy { it.first.id }.map { it.second }
+            for (item in items) {
+                println(item)
+            }
+        }
+
+        @Test
+        fun `print accessingFunction graphs`() {
+            val cfg = methodToGraph.getCFG(A::accessingFunction.javaMethod)
+            val adapted = GraalAdapter.fromGraal(cfg)
+
+            val sw = StringWriter()
+            adapted.exportQuery(sw)
+
+            println(sw.buffer)
+        }
+
+        @Test
+        fun `get read write edges via graph executor`() {
+            val method = ::allocatingFunction.javaMethod // A::accessingFunction.javaMethod
+            val cfg = methodToGraph.getCFG(method)
+            val graph = GraalAdapter.fromGraal(cfg)
+            val analyzer = object : QueryExecutor<String>(graph, { "" }) {
+                // someField [ label="(?P<mergePath>)|not is('AbstractMergeNode') and not is ('ReturnNode') and not is('LoopEndNode') and not is ('LoopExitNode')" ];
+                val loadQuery by """
+digraph G {
+	loadField [ label="(?P<loadfield>)|is('java.LoadFieldNode')" ];
+	value [ label="(?P<value>)|1 = 1" ];
+
+	value -> loadField [ label="is('DATA') and name() = 'object'" ];
+}
+"""
+                val loadQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    val loadField = captureGroups.getValue("loadfield").first()
+                    val value = captureGroups.getValue("value").first()
+                    // I'd use LoadFieldNode.field() for below but I can't get it to work because of module issues
+                    fun getNameFromNode(node: NodeWrapper) = (node.node as LoadFieldNode).toString().split("#")[1] // perfect code 10/10
+//                    fun formatValueName(node: NodeWrapper): String {
+//                        val paramId = (node.node as ValueNode).toString().split("|")[1].removeSurrounding("Parameter(", ")").toInt()
+//                        return "parameter #$paramId"
+//                    }
+                    fun formatValueName(node: NodeWrapper) = (node.node as ValueNode).toString().split("|")[1]
+                    state[loadField] = "Loading in ID ${loadField.id} value from ${formatValueName(value)} field name ${getNameFromNode(loadField)}"
+                }
+
+                val storeQuery by """
+digraph G {
+	storeField [ label="(?P<storefield>)|is('java.StoreFieldNode')" ];
+	value [ label="(?P<value>)|1 = 1" ];
+
+	value -> storeField [ label="is('DATA') and name() = 'value'" ];
+}
+"""
+                val storeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    val storeField = captureGroups.getValue("storefield").first()
+                    val value = captureGroups.getValue("value").first()
+                    // I'd use StoreFieldNode.field() for below but I can't get it to work because of module issues
+                    fun getNameFromNode(node: NodeWrapper) = (node.node as StoreFieldNode).toString().split("#")[1] // perfect code 10/10
+                    fun formatValueName(node: NodeWrapper) = (node.node as ValueNode).toString().split("|")[1]
+                    state[storeField] = "Storing in ID ${storeField.id} value from ${formatValueName(value)} field name ${getNameFromNode(storeField)}"
+                }
+            }
+            val results = analyzer.iterateUntilFixedPoint()
+            val items = results.toList().asSequence().sortedBy { it.first.id }.map { it.second }
+            for (item in items) {
+                println(item)
+            }
+        }
+
+        /** Interesting:
+         * public static final boolean TRACK_CREATION_POSITION = Boolean.parseBoolean(Services.getSavedProperties().get("debug.graal.TrackNodeCreationPosition"));
+         * In Graal's org.graalvm.compiler.graph.Node.java
+         * Enough to change jdk.internal.misc.VM.getSavedProperties()["debug.graal.TrackNodeCreationPosition"] to "true"
+         */
+    }
+}
