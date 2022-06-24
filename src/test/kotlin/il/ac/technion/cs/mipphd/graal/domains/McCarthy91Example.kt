@@ -40,9 +40,9 @@ data class Item(
 class McCarthy91Analysis(graph: GraalAdapter) : QueryExecutor<Item>(graph, Item::default) {
     val arithmeticQuery by """
 digraph G {
-	arith [ label="(?P<arithmeticNode>)|1 = 1" ];
-	x [ label="(?P<x>)|1 = 1" ];
-	y [ label="(?P<y>)|1 = 1" ];
+	arith [ label="(?P<arithmeticNode>)|true" ];
+	x [ label="(?P<x>)|true" ];
+	y [ label="(?P<y>)|true" ];
 
 	x -> arith [ label="is('DATA') and name() = 'x'" ];
 	y -> arith [ label="is('DATA') and name() = 'y'" ];

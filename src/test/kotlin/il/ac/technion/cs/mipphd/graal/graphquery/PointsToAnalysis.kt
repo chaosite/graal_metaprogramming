@@ -1,5 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
+import il.ac.technion.cs.mipphd.graal.SourcePosTool
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
@@ -180,18 +181,25 @@ internal class PointsToAnalysis {
 
         @Test
         fun `get alloc nodes via graph executor`() {
-            println(Node.TRACK_CREATION_POSITION)
+//            println(Node.TRACK_CREATION_POSITION)
             val cfg = methodToGraph.getCFG(::allocatingFunction.javaMethod)
             val graph = GraalAdapter.fromGraal(cfg)
+            val typeMethod = VirtualInstanceNode::class.java.getDeclaredMethod("type") // ()->ResolvedJavaType, escaping module issues
+            val nameFromJavaTypeMethod = Class.forName("jdk.vm.ci.meta.JavaType").getDeclaredMethod("getName")
             val analyzer = object : QueryExecutor<String>(graph, { "" }) {
                 val virtualQuery by """
 digraph G {
-    n [ label="(?P<virtual>)|is('virtual.VirtualInstanceNode')" ];
+    n [ label="(?P<virtual>)|is('VirtualInstanceNode')" ];
 }
 """
                 val virtual: CaptureGroupAction<String> by { nodes: List<NodeWrapper> ->
-                    val node = nodes.first()
-                    (node.node as VirtualInstanceNode).creationPosition.toString()// objectId.toString() // object ID from cfg
+                    val node = nodes.first().node as VirtualInstanceNode
+                    val stacktrace = SourcePosTool.getStackTraceElement(node)
+                    val typeName = (nameFromJavaTypeMethod(typeMethod(node)) as String)
+                        .removeSurrounding("L", ";")
+                        .split("/").joinToString(".")
+                    "allocation of $typeName at ${stacktrace.className}.${stacktrace.methodName}:${stacktrace.lineNumber}"
+//                    (node.node as VirtualInstanceNode).creationPosition.toString()// objectId.toString() // object ID from cfg
                 }
             }
             val results = analyzer.iterateUntilFixedPoint()
@@ -214,17 +222,21 @@ digraph G {
 
         @Test
         fun `get read write edges via graph executor`() {
-            val method = ::allocatingFunction.javaMethod // A::accessingFunction.javaMethod
+            val method = ::complete.javaMethod // A::accessingFunction.javaMethod
             val cfg = methodToGraph.getCFG(method)
             val graph = GraalAdapter.fromGraal(cfg)
             val analyzer = object : QueryExecutor<String>(graph, { "" }) {
-                // someField [ label="(?P<mergePath>)|not is('AbstractMergeNode') and not is ('ReturnNode') and not is('LoopEndNode') and not is ('LoopExitNode')" ];
+                // Change "query is not weakly connected" error to "missing edges in query" or something like that
+                // Allow accessing of query results separately
+                // A metafunction: length of kleene star path
                 val loadQuery by """
 digraph G {
 	loadField [ label="(?P<loadfield>)|is('java.LoadFieldNode')" ];
-	value [ label="(?P<value>)|1 = 1" ];
+    nop [ label="(?P<nop>)|is('PiNode')" ];
+	value [ label="(?P<value>)|not is('PiNode')" ];
 
-	value -> loadField [ label="is('DATA') and name() = 'object'" ];
+	value -> nop [ label="*|is('DATA') and name() = 'object'" ];
+    nop -> loadField [ label="is('DATA')" ];
 }
 """
                 val loadQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
@@ -269,5 +281,17 @@ digraph G {
          * In Graal's org.graalvm.compiler.graph.Node.java
          * Enough to change jdk.internal.misc.VM.getSavedProperties()["debug.graal.TrackNodeCreationPosition"] to "true"
          */
+
+        @Test
+        fun `print 'complete' graph`() {
+            val cfg = methodToGraph.getCFG(::complete.javaMethod)
+            val adapted = GraalAdapter.fromGraal(cfg)
+
+            val sw = StringWriter()
+            adapted.exportQuery(sw)
+
+            println(sw.buffer)
+            assertTrue(true)
+        }
     }
 }
