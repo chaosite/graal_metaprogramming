@@ -123,6 +123,32 @@ fun allocatingFunction(x: Int, y: Int, z: Int) {
     forceAllocSet.add(c)
 }
 
+fun aliasingFunction(x: Int, y: Int, z: Int) {
+    var a = A(x)
+    var b = A(y)
+    var c = A(z)
+    var temp = b
+    b = a
+    temp = a
+    a = c
+    c = temp
+    forceAllocSet.add(a)
+    forceAllocSet.add(b)
+    forceAllocSet.add(c)
+}
+
+external fun anyUser(any: Any?): Boolean
+data class AnyHolder(val any: Any?, val other: Any? = null) // { init { anyUser(this) } }
+fun anyHolder(param: String?): AnyHolder {
+    val first = AnyHolder(param ?: "")
+    anyUser(first)
+    val second = AnyHolder(first, param ?: "") // AnyHolder(if(anyUser(param)) first else param)
+    anyUser(second)
+    val third = AnyHolder(second)
+    anyUser(third)
+    return third
+}
+
 //fun accessingFunction(a: A, b: A, c: A) {
 //    val num1 = a.num
 //    val num2 = b.num
@@ -182,9 +208,10 @@ internal class PointsToAnalysis {
         @Test
         fun `get alloc nodes via graph executor`() {
 //            println(Node.TRACK_CREATION_POSITION)
-            val cfg = methodToGraph.getCFG(::allocatingFunction.javaMethod)
+            val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
             val graph = GraalAdapter.fromGraal(cfg)
-            val typeMethod = VirtualInstanceNode::class.java.getDeclaredMethod("type") // ()->ResolvedJavaType, escaping module issues
+            val typeMethod =
+                VirtualInstanceNode::class.java.getDeclaredMethod("type") // ()->ResolvedJavaType, escaping module issues
             val nameFromJavaTypeMethod = Class.forName("jdk.vm.ci.meta.JavaType").getDeclaredMethod("getName")
             val analyzer = object : QueryExecutor<String>(graph, { "" }) {
                 val virtualQuery by """
@@ -242,14 +269,19 @@ digraph G {
                 val loadQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
                     val loadField = captureGroups.getValue("loadfield").first()
                     val value = captureGroups.getValue("value").first()
+
                     // I'd use LoadFieldNode.field() for below but I can't get it to work because of module issues
-                    fun getNameFromNode(node: NodeWrapper) = (node.node as LoadFieldNode).toString().split("#")[1] // perfect code 10/10
-//                    fun formatValueName(node: NodeWrapper): String {
+                    fun getNameFromNode(node: NodeWrapper) =
+                        (node.node as LoadFieldNode).toString().split("#")[1] // perfect code 10/10
+
+                    //                    fun formatValueName(node: NodeWrapper): String {
 //                        val paramId = (node.node as ValueNode).toString().split("|")[1].removeSurrounding("Parameter(", ")").toInt()
 //                        return "parameter #$paramId"
 //                    }
                     fun formatValueName(node: NodeWrapper) = (node.node as ValueNode).toString().split("|")[1]
-                    state[loadField] = "Loading in ID ${loadField.id} value from ${formatValueName(value)} field name ${getNameFromNode(loadField)}"
+                    state[loadField] = "Loading in ID ${loadField.id} value from ${formatValueName(value)} field name ${
+                        getNameFromNode(loadField)
+                    }"
                 }
 
                 val storeQuery by """
@@ -263,14 +295,20 @@ digraph G {
                 val storeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
                     val storeField = captureGroups.getValue("storefield").first()
                     val value = captureGroups.getValue("value").first()
+
                     // I'd use StoreFieldNode.field() for below but I can't get it to work because of module issues
-                    fun getNameFromNode(node: NodeWrapper) = (node.node as StoreFieldNode).toString().split("#")[1] // perfect code 10/10
+                    fun getNameFromNode(node: NodeWrapper) =
+                        (node.node as StoreFieldNode).toString().split("#")[1] // perfect code 10/10
+
                     fun formatValueName(node: NodeWrapper) = (node.node as ValueNode).toString().split("|")[1]
-                    state[storeField] = "Storing in ID ${storeField.id} value from ${formatValueName(value)} field name ${getNameFromNode(storeField)}"
+                    state[storeField] =
+                        "Storing in ID ${storeField.id} value from ${formatValueName(value)} field name ${
+                            getNameFromNode(storeField)
+                        }"
                 }
             }
             val results = analyzer.iterateUntilFixedPoint()
-            val items = results.toList().asSequence().sortedBy { it.first.id }.map { it.second }
+            val items = results.toList().sortedBy { it.first.id }.map { it.second }
             for (item in items) {
                 println(item)
             }
@@ -292,6 +330,112 @@ digraph G {
 
             println(sw.buffer)
             assertTrue(true)
+        }
+
+        @Test
+        fun `print anyHolder graphs`() {
+            val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
+            val adapted = GraalAdapter.fromGraal(cfg)
+
+            val sw = StringWriter()
+            adapted.exportQuery(sw)
+
+            println(sw.buffer)
+        }
+
+        @Test
+        fun `get pointsto graph preliminaries of anyHolder`() {
+            val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
+            val graph = GraalAdapter.fromGraal(cfg)
+            val nopNodes = listOf("Pi", "VirtualInstance", "ValuePhi", "Begin", "Merge", "End", "FrameState", "VirtualObjectState", "MaterializedObjectState")
+                .map { if(it.endsWith("State")) it else "${it}Node" }
+            // actually, we do want to search for CommitAllocation and not VirtualInstance because CommitAllocation is where the parameters come in
+            val constructorCallSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
+                val virtualQuery by """
+digraph G {
+    commitAllocNode [ label="(?P<alloc>)|is('CommitAllocationNode')" ];
+    nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
+	value [ label="(?P<value>)|${nopNodes.joinToString(" and ") { "not is('$it')" }}" ];
+
+	value -> nop [ label="*|is('DATA')" ];
+    nop -> commitAllocNode [ label="is('DATA')" ];
+}
+""" // value -> nop [ label="*|is('DATA') and name() = 'object'" ];
+                val virtualQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    state[captureGroups["alloc"]!!.first()]?.addAll(captureGroups["value"]!!)
+                        ?: (captureGroups["value"]!!.toMutableSet()
+                            .also { state[captureGroups["alloc"]!!.first()] = it })
+                    Unit
+                }
+            }
+            val results = constructorCallSiteQuery.iterateUntilFixedPoint()
+            val items = results.toList().sortedBy { it.first.id }
+            for (item in items) {
+                println(item)
+            }
+            println()
+            val associationQuery = object : QueryExecutor<NodeWrapper?>(graph, { null }) {
+                val virtualQuery by """
+digraph G {
+    commitAllocNode [ label="(?P<alloc>)|is('CommitAllocationNode')" ];
+	allocatedObjNode [ label="(?P<obj>)|is('AllocatedObjectNode')" ];
+
+    commitAllocNode -> allocatedObjNode [ label="is('DATA')" ];
+}
+"""
+                val virtualQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    state[captureGroups["obj"]!!.first()] = captureGroups["alloc"]!!.first()
+                }
+            }
+
+            val associationResults = associationQuery.iterateUntilFixedPoint()
+            val associationItems = associationResults.toList().sortedBy { it.first.id }
+            for (item in associationItems) {
+                println(item)
+            }
+            println()
+            val associated = associationItems.associate { itt -> itt.first to items.first { it.first == itt.second }.second }
+            for (item in associated) {
+                println(item)
+            }
+        }
+
+        // 3 sorts of nodes:
+        // CommitAllocation - represents the beginning of the constructor
+        // VirtualInstance - represents the end of the constructor
+        // AllocatedObject - represents the allocated object itself
+
+        @Test
+        fun `get pointsto graph of anyHolder`() {
+            val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
+            val graph = GraalAdapter.fromGraal(cfg)
+            // actually, we do want to search for CommitAllocation and not VirtualInstance because CommitAllocation is where the parameters come in
+            val constructorCallSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
+                val virtualQuery by """
+digraph G {
+    commitAllocNode [ label="(?P<alloc>)|is('CommitAllocationNode')" ];
+    nop [ label="(?P<nop>)|is('PiNode') or is('VirtualInstanceNode')" ];
+	value [ label="(?P<value>)|not is('PiNode') and not is('VirtualInstanceNode')" ];
+    commitAllocOrig [ label="(?P<allocOrig>)|is('CommitAllocationNode')" ]; """ /* we need to make this and the next line optional */  + """
+
+    commitAllocOrig -> value [ label="is('DATA') and name() = 'commit'" ];
+	value -> nop [ label="*|is('DATA') and name() = 'object'" ];
+    nop -> commitAllocNode [ label="is('DATA')" ];
+}
+"""
+                val virtualQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    state[captureGroups["alloc"]!!.first()]?.addAll(captureGroups["allocOrig"]!!)
+                        ?: (captureGroups["allocOrig"]!!.toMutableSet()
+                            .also { state[captureGroups["alloc"]!!.first()] = it })
+                    Unit
+                }
+            }
+            val results = constructorCallSiteQuery.iterateUntilFixedPoint()
+            val items = results.toList().sortedBy { it.first.id }
+            for (item in items) {
+                println(item)
+            }
+
         }
     }
 }

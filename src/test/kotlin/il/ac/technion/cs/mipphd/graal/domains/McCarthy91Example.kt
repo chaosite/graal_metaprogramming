@@ -40,9 +40,9 @@ data class Item(
 class McCarthy91Analysis(graph: GraalAdapter) : QueryExecutor<Item>(graph, Item::default) {
     val arithmeticQuery by """
 digraph G {
-	arith [ label="(?P<arithmeticNode>)|true" ];
-	x [ label="(?P<x>)|true" ];
-	y [ label="(?P<y>)|true" ];
+	arith [ label="(?P<arithmeticNode>)|" ];
+	x [ label="(?P<x>)|" ];
+	y [ label="(?P<y>)|" ];
 
 	x -> arith [ label="is('DATA') and name() = 'x'" ];
 	y -> arith [ label="is('DATA') and name() = 'y'" ];
@@ -105,7 +105,7 @@ digraph G {
     val ifConditionQuery by """
 digraph G {
 	ifnode [ label="(?P<ifnode>)|is('IfNode')" ];
-	cmp [ label="(?P<ifcondition>)|1 = 1" ];
+	cmp [ label="(?P<ifcondition>)|" ];
 
 	cmp -> ifnode [ label="is('DATA') and name() = 'condition'" ];
 }
@@ -119,8 +119,8 @@ digraph G {
     val ifPathQuery by """
 digraph G {
     ifnode [ label="(?P<ifpathnode>)|is('IfNode')" ];
-    truepath [ label="(?P<truepath>)|1 = 1" ];
-    falsepath [ label="(?P<falsepath>)|1 = 1" ];
+    truepath [ label="(?P<truepath>)|" ];
+    falsepath [ label="(?P<falsepath>)|" ];
 
     ifnode -> truepath [ label="is('CONTROL') and name() = 'trueSuccessor'" ];
     ifnode -> falsepath [ label="is('CONTROL') and name() = 'falseSuccessor'" ];
@@ -141,8 +141,8 @@ digraph G {
 digraph G {
 	framestate [ label="is('FrameState')" ];
 	merge [ label="(?P<mergenode>)|is('AbstractMergeNode')" ];
-	values [ label="[](?P<phivalues>)|1 = 1" ];
-    sourcevalues [ label="[](?P<phisourcevalues>)|1 = 1" ];
+	values [ label="[](?P<phivalues>)|" ];
+    sourcevalues [ label="[](?P<phisourcevalues>)|" ];
 
 	values -> framestate [ label = "is('DATA') and name() = 'values'" ];
     merge -> values [ label = "name() = 'merge'" ];
@@ -286,7 +286,7 @@ digraph G {
     val returnNodeQuery by """
 digraph G {
     r [ label = "(?P<returnNode>)|is('ReturnNode')" ];
-    v [ label = "(?P<value>)|1 = 1" ];
+    v [ label = "(?P<value>)|" ];
     
     v -> r [ label = "is('DATA')" ];
 }
