@@ -46,21 +46,13 @@ internal class MethodToGraphTest {
         val cfg = methodToGraph.getCFG(addNumbersMethod)
         val returnNode = cfg.asCFG().startBlock.endNode
 
-        val creationStackTrace = returnNode.creationPosition
-        // cheat with reflection to get actual stack trace
-
-        val field = creationStackTrace.javaClass.superclass.getDeclaredField("stackTrace")
-        field.isAccessible = true // needs --add-opens jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED
-        val trace = field.get(creationStackTrace) as Array<StackTraceElement>
-        println(creationStackTrace)
-        println(trace[0])
-
         // val nodeSourcePosition = returnNode.nodeSourcePosition
         println(returnNode.nodeSourcePosition)
         println(SourcePosTool.getBCI(returnNode))
         println(SourcePosTool.getLocation(returnNode))
 
-        println(SourcePosTool.getStackTraceElement(returnNode))
+        println(SourcePosTool.getStackTraceElement(returnNode).className)
+        println(SourcePosTool.getStackTraceElement(returnNode).methodName)
         println(SourcePosTool.getStackTraceElement(returnNode).fileName)
         println(SourcePosTool.getStackTraceElement(returnNode).lineNumber)
     }
