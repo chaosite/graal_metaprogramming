@@ -15,8 +15,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.io.StringWriter
-import java.lang.reflect.Field
-import java.lang.reflect.Modifier
 import kotlin.random.Random
 import kotlin.reflect.jvm.javaMethod
 
@@ -138,7 +136,8 @@ fun aliasingFunction(x: Int, y: Int, z: Int) {
 }
 
 external fun anyUser(any: Any?): Boolean
-data class AnyHolder(val any: Any?, val other: Any? = null) // { init { anyUser(this) } }
+data class AnyHolder(var any: Any? = null, var other: Any? = null) // { init { anyUser(this) } }
+
 fun anyHolder(param: String?): AnyHolder {
     val first = AnyHolder(param ?: "")
     anyUser(first)
@@ -149,11 +148,59 @@ fun anyHolder(param: String?): AnyHolder {
     return third
 }
 
+fun anyHolder2(param: String?): AnyHolder {
+    val first = AnyHolder()
+    anyUser(first) // order is important - otherwise it will be optimized away and there will be no stores
+    first.any = param ?: "" // param0, const"", alloc line 151
+    first.other = null // const null
+
+    val second = AnyHolder()
+    anyUser(second)
+    second.any = first // alloc line 151
+    second.other = param ?: "" // param0, const"", alloc line 156
+
+    val third = AnyHolder()
+    anyUser(third)
+    third.any = second // alloc line 156
+    third.other = null // const null
+
+    val fourth = AnyHolder()
+    anyUser(fourth)
+    fourth.any = second.other
+    fourth.other = third.any
+
+    return third
+}
+
 //fun accessingFunction(a: A, b: A, c: A) {
 //    val num1 = a.num
 //    val num2 = b.num
 //    val num3 = c.num
 //}
+
+class GenericObjectWithField(val obj: NodeWrapper?, val field: String) : NodeWrapper(null) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is GenericObjectWithField) return false
+        if (obj != other.obj) return false
+        if (field != other.field) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = obj.hashCode()
+        result = 31 * result + field.hashCode()
+        return result
+    }
+
+    override fun toString(): String {
+        return "($obj, $field)"
+    }
+
+    override fun isType(className: String?): Boolean {
+        return className == "GenericObjectWithField"
+    }
+}
 
 internal class PointsToAnalysis {
     init {
@@ -347,8 +394,18 @@ digraph G {
         fun `get pointsto graph preliminaries of anyHolder`() {
             val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
             val graph = GraalAdapter.fromGraal(cfg)
-            val nopNodes = listOf("Pi", "VirtualInstance", "ValuePhi", "Begin", "Merge", "End", "FrameState", "VirtualObjectState", "MaterializedObjectState")
-                .map { if(it.endsWith("State")) it else "${it}Node" }
+            val nopNodes = listOf(
+                "Pi",
+                "VirtualInstance",
+                "ValuePhi",
+                "Begin",
+                "Merge",
+                "End",
+                "FrameState",
+                "VirtualObjectState",
+                "MaterializedObjectState"
+            )
+                .map { if (it.endsWith("State")) it else "${it}Node" }
             // actually, we do want to search for CommitAllocation and not VirtualInstance because CommitAllocation is where the parameters come in
             val constructorCallSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
                 val virtualQuery by """
@@ -394,7 +451,8 @@ digraph G {
                 println(item)
             }
             println()
-            val associated = associationItems.associate { itt -> itt.first to items.first { it.first == itt.second }.second }
+            val associated =
+                associationItems.associate { itt -> itt.first to items.first { it.first == itt.second }.second }
             for (item in associated) {
                 println(item)
             }
@@ -416,7 +474,7 @@ digraph G {
     commitAllocNode [ label="(?P<alloc>)|is('CommitAllocationNode')" ];
     nop [ label="(?P<nop>)|is('PiNode') or is('VirtualInstanceNode')" ];
 	value [ label="(?P<value>)|not is('PiNode') and not is('VirtualInstanceNode')" ];
-    commitAllocOrig [ label="(?P<allocOrig>)|is('CommitAllocationNode')" ]; """ /* we need to make this and the next line optional */  + """
+    commitAllocOrig [ label="(?P<allocOrig>)|is('CommitAllocationNode')" ]; """ /* we need to make this and the next line optional */ + """
 
     commitAllocOrig -> value [ label="is('DATA') and name() = 'commit'" ];
 	value -> nop [ label="*|is('DATA') and name() = 'object'" ];
@@ -436,6 +494,104 @@ digraph G {
                 println(item)
             }
 
+        }
+
+
+        @Test
+        fun `print anyHolder2 graphs`() {
+            val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
+            val adapted = GraalAdapter.fromGraal(cfg)
+
+            val sw = StringWriter()
+            adapted.exportQuery(sw)
+
+            val rawGraph = sw.buffer.toString().split("\n")
+            val frameStateNodes = rawGraph.filter { it.contains("FrameState") }
+                .map { it.trim().split(" ")[0] }.toSet()
+            println(rawGraph.filter {
+                "FrameState" !in it && frameStateNodes.all { itt -> " $itt -" !in it && "> $itt " !in it }
+            }.joinToString("\n"))
+        }
+
+
+        @Test
+        fun `get pointsto graph preliminaries of anyHolder2`() {
+            val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
+            val graph = GraalAdapter.fromGraal(cfg)
+            val nopNodes = listOf(
+                "Pi",
+                "VirtualInstance",
+                "ValuePhi",
+                "Begin",
+                "Merge",
+                "End",
+                "FrameState",
+                "VirtualObjectState",
+                "MaterializedObjectState"
+            ).map { if (it.endsWith("State")) it else "${it}Node" }
+
+            val storeSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
+                val storeQuery by """
+digraph G {
+    storeNode [ label="(?P<store>)|is('StoreFieldNode')" ];
+    nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
+	value [ label="(?P<value>)|${nopNodes.joinToString(" and ") { "not is('$it')" }}" ];
+
+	value -> nop [ label="*|is('DATA')" ];
+    nop -> storeNode [ label="name() = 'value'" ];
+}
+"""
+                val storeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    state[captureGroups["store"]!!.first()]?.addAll(captureGroups["value"]!!)
+                        ?: (captureGroups["value"]!!.toMutableSet()
+                            .also { state[captureGroups["store"]!!.first()] = it })
+                    Unit
+                }
+            }
+            val results = storeSiteQuery.iterateUntilFixedPoint()
+            val items = results.toList().sortedBy { it.first.id }
+            for (item in items) {
+                println(item)
+            }
+            println()
+            val fieldAssociationQuery = object : QueryExecutor<NodeWrapper?>(graph, { null }) {
+                val assocQuery by """
+digraph G {
+    storeNode [ label="(?P<store>)|is('StoreFieldNode') or is('LoadFieldNode')" ];
+	value [ label="(?P<value>)|is('AllocatedObjectNode')" ];
+
+	value -> storeNode [ label="name() = 'object'" ];
+}
+"""
+                val assocQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    state[captureGroups["store"]!!.first()] = captureGroups["value"]!!.first()
+                }
+            }
+            val resultsFieldAssoc = fieldAssociationQuery.iterateUntilFixedPoint()
+            val itemsFieldAssoc = resultsFieldAssoc.toList().sortedBy { it.first.id }.filter { it.first.node is StoreFieldNode }
+            for (item in itemsFieldAssoc) {
+                println(item)
+            }
+            println()
+            val clazz = Class.forName("org.graalvm.compiler.nodes.java.AccessFieldNode")
+            val fieldMethod = clazz.getDeclaredMethod("field")
+            val fieldClazz = Class.forName("jdk.vm.ci.meta.JavaField")
+            val fieldNameMethod = fieldClazz.getDeclaredMethod("getName")
+            val associated =
+                itemsFieldAssoc.associate { itt ->
+                    val key = GenericObjectWithField(itt.second, fieldNameMethod(fieldMethod(itt.first.node)) as String)
+                    val value = mutableListOf<NodeWrapper>()
+                    for (node in (items.firstOrNull { it.first == itt.first }?.second ?: listOf())) {
+                        if (node.node is LoadFieldNode) {
+                            value.add(GenericObjectWithField(resultsFieldAssoc.toList().first { it.first == node }.second,
+                                fieldNameMethod(fieldMethod(node.node)) as String))
+                        } else value.add(node)
+                    }
+                    key to value
+                }
+            for (item in associated) {
+                println(item)
+            } // todo next: figure out why it sometimes adds itself to references
         }
     }
 }
