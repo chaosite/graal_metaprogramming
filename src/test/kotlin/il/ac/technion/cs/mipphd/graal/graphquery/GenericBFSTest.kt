@@ -14,7 +14,7 @@ internal class GenericBFSTest {
     private val methodToGraph = MethodToGraph()
     private val maximum = Listable::maximum.javaMethod
 
-    @Test
+    //@Test
     fun `maximum query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
 
@@ -26,7 +26,7 @@ internal class GenericBFSTest {
         assertEquals(18, results.size)
     }
 
-    @Test
+    //@Test
     fun `minimal query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphMaker.createMinimalQuery()
@@ -37,7 +37,7 @@ internal class GenericBFSTest {
         assertEquals(2, results.size)
     }
 
-    @Test
+    //@Test
     fun `minimal kleene query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphMaker.createMinimalKleeneQuery()
@@ -48,7 +48,7 @@ internal class GenericBFSTest {
         assertEquals(22, results.size)
     }
 
-    @Test
+    //@Test
     fun `two vertex one edge query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphMaker.createTwoVertexOneEdgeQuery()
@@ -59,7 +59,7 @@ internal class GenericBFSTest {
         assertEquals(2, results.size)
     }
 
-    @Test
+    //@Test
     fun `kleene query with return matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphMaker.createSimpleKleeneQueryWithReturn()
@@ -74,11 +74,11 @@ internal class GenericBFSTest {
     }
 
 
-    @Test
+    //@Test
     fun `possibleChildrenMatches returns something in non-Kleene case`() {
     }
 
-    @Test
+    //@Test
     fun `possibleChildrenMatches returns something in Kleene case`() {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphMaker.createMaxGraph()
@@ -100,11 +100,11 @@ internal class GenericBFSTest {
         assertEquals(2, result.maxOf { it[queryReturnKleene]!!.size })
     }
 
-    @Test
+   // @Test
     fun permutations() {
     }
 
-    @Test
+    //@Test
     fun cartesianProduct() {
     }
 }

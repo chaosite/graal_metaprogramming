@@ -95,8 +95,8 @@ fun kleeneTransitiveClosure(
     val firstSteps = singleStep(graph, queryE, queryW, graphStart, dir)
     ret.addAll(firstSteps)
     queue.addAll(firstSteps.map { it.orNull()!! })
-
-    while (!queue.isEmpty()) {
+    var limit = 50;
+    while (!queue.isEmpty() && limit-- > 0) {
         val path = queue.removeFirst()
         val graphV = path.last()
         visited.add(graphV)

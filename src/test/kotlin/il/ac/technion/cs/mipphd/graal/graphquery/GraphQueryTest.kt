@@ -51,7 +51,7 @@ internal class GraphQueryTest {
     val maximum = Listable::maximum.javaMethod
     val maximumQuery = GraphMaker.createMaxGraph()
 
-    @Test
+    //@Test
     fun `all nodes in query match some node in actual graph`() {
         val cfg = methodToGraph.getCFG(maximum)
         val set = mutableSetOf(*cfg.asCFG().graph.nodes.toList().toTypedArray())
@@ -60,19 +60,19 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+   // @Test
     fun `maximum query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         assertEquals(18, maximumQuery.match(cfg).size)
     }
 
-    @Test
+    //@Test
     fun `minimal query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         assertEquals(2, GraphMaker.createMinimalQuery().match(cfg).size)
     }
 
-    @Test
+   // @Test
     fun `repeated query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         val results = GraphQuery.importQuery(repeatedNodesQueryText).match(cfg)
@@ -82,20 +82,20 @@ internal class GraphQueryTest {
         assertEquals(19, results.size)
     }
 
-    @Test
+   // @Test
     fun `two vertex one edge query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         assertEquals(2, GraphMaker.createTwoVertexOneEdgeQuery().match(cfg).size)
     }
 
-    @Test
+   // @Test
     fun `export does not throw`() {
         val writer = StringWriter()
         GraphMaker.createMaxGraph().exportQuery(writer)
         println(writer.buffer.toString())
     }
 
-    @Test
+    //@Test
     fun `export-import round trip does not throw`() {
         val writer = StringWriter()
         GraphMaker.createMaxGraph().exportQuery(writer)
@@ -104,7 +104,7 @@ internal class GraphQueryTest {
         GraphQuery.importQuery(reader)
     }
 
-    @Test
+    //@Test
     fun `imported maximum query matches maximum function ir`() {
         val cfg = methodToGraph.getCFG(maximum)
         val query = GraphQuery.importQuery(StringReader(maximumQueryText))
@@ -121,7 +121,7 @@ internal class GraphQueryTest {
         assertEquals(18, query.match(cfg).size)
     }
 
-    @Test
+   // @Test
     fun `imported anon graph query union`() {
         val cfg = AnonGraphReduced();
         val query = UnionUsingArrayDotQuery();
@@ -142,7 +142,7 @@ internal class GraphQueryTest {
     }
 
 
-    @Test
+    //@Test
     fun `imported anon graph query loop with index and loadfield`() {
         val cfg = AnonGraphReduced();
         val query = LoopWithIteratorWithExtraStepsDotQuery();
@@ -157,7 +157,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+    //@Test
     fun `imported anon graph query loop with index and array access`() {
         val cfg = AnonGraphReduced();
         val query = LoopWithIteratorWithExtraStepsArrayDotQuery();
@@ -173,7 +173,7 @@ internal class GraphQueryTest {
     }
 
 
-    @Test
+    //@Test
     fun `imported anon graph query split node`() {
         val cfg = AnonGraphReduced();
         val query = SplitCollectionIndexedPairDotQuery();
@@ -191,7 +191,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+    //@Test
     fun `imported anon graph query invoke with param`() {
         val cfg = AnonGraphReduced();
         val query = FunctionInvokeOneParamQueryDot();
@@ -206,7 +206,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+    //@Test
     fun `imported anon graph query if with cond`() {
         val cfg = AnonGraphReduced();
         val query = IfWithConditionQueryDot();
@@ -221,7 +221,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+    //@Test
     fun `imported anon graph query func invoke two param in branch`() {
         val cfg = AnonGraphReduced();
         val query = FunctionInvokeTwoParamInsideScopeQueryDot();
@@ -236,7 +236,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+    //@Test
     fun `imported anon graph query func invoke two param`() {
         val cfg = AnonGraphReduced();
         val query = FunctionInvokeTwoParamInsideScopeQueryDot();
@@ -251,7 +251,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+    //@Test
     fun `uber match anon algo 6 queries - loop split union func func if `() {
         val cfg = AnonGraphReduced();
         val unionQuery = UnionUsingArrayDotQuery()
@@ -293,7 +293,7 @@ internal class GraphQueryTest {
     }
 
 
-    @Test
+    //@Test
     fun `uber match anon algo 7 queries - loop split union func func if invoke2`() {
         val cfg = AnonGraphReduced();
         val unionQuery = UnionUsingArrayDotQuery()
@@ -375,7 +375,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+    //@Test
     fun `Kruskal1 union query`(){
         var cfg = Kruskal1GraphReduced()
         val unionQuery = UnionUsingArrayDotQuery()
@@ -391,7 +391,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+    //@Test
     fun `Kruskal1 mini uber match`(){
         var cfg = Kruskal1GraphReduced()
         val unionQuery = UnionUsingArrayDotQuery()
@@ -488,7 +488,7 @@ internal class GraphQueryTest {
         }
     }
 
-    @Test
+   // @Test
     fun `Kruskal1 uber match`() {
         var cfg = Kruskal1GraphReduced()
         val unionQuery = UnionUsingArrayDotQuery()

@@ -31,10 +31,10 @@ import java.util.stream.StreamSupport;
 import static il.ac.technion.cs.mipphd.graal.utils.EdgeWrapper.CONTROL;
 
 public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> {
-    private static final Map<String, String> edgeColor = Map.of(EdgeWrapper.DATA, "blue",
+    public static final Map<String, String> edgeColor = Map.of(EdgeWrapper.DATA, "blue",
             CONTROL, "red",
             EdgeWrapper.ASSOCIATED, "black");
-    private static final Map<String, String> edgeStyle = Map.of(EdgeWrapper.DATA, "",
+    public static final Map<String, String> edgeStyle = Map.of(EdgeWrapper.DATA, "",
             CONTROL, "",
             EdgeWrapper.ASSOCIATED, "dashed");
 
@@ -153,6 +153,42 @@ public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> 
         exporter.exportGraph(subgraph, output);
 
     }
+
+    public void exportMatch(Writer output, List<Integer> matchedPorts){
+        DOTExporter<NodeWrapper, EdgeWrapper> exporter =
+                new DOTExporter<>(v -> Integer.toString(v.getNode().asNode().getId()));
+
+        exporter.setVertexAttributeProvider(v -> {
+            final Map<String, Attribute> attrs = new HashMap<>();
+            if(matchedPorts.contains(v.getId())){
+                attrs.put("fontsize", DefaultAttribute.createAttribute(50));
+                attrs.put("shape", DefaultAttribute.createAttribute("box"));
+                attrs.put("fillcolor", DefaultAttribute.createAttribute("green"));
+                attrs.put("style", DefaultAttribute.createAttribute("filled"));
+            }
+            attrs.put("label", DefaultAttribute.createAttribute(v.getNode().toString()));
+            return attrs;
+        });
+
+        exporter.setEdgeAttributeProvider(e -> {
+            final Map<String, Attribute> attrs = new HashMap<>();
+            attrs.put("label", DefaultAttribute.createAttribute(e.getName()));
+            attrs.put("color", DefaultAttribute.createAttribute(edgeColor.get(e.getLabel())));
+            attrs.put("style", DefaultAttribute.createAttribute(edgeStyle.get(e.getLabel())));
+//            if(e.getLabel().equals(CONTROL)){
+//                attrs.put("penwidth ", DefaultAttribute.createAttribute("2"));
+//            }
+//            var source = this.getEdgeSource(e);
+//            var target = this.getEdgeTarget(e);
+//            if(matches.contains(source) && matches.contains(target)){
+//                attrs.put("penwidth", DefaultAttribute.createAttribute(10));
+//            }
+            return attrs;
+        });
+        exporter.exportGraph(this, output);
+    }
+
+
     public void exportQuery(Writer output, Map<GraphQueryVertex, List<NodeWrapper>> matches) {
         exportQuery(output, matches,null);
     }
@@ -329,8 +365,11 @@ public class GraalAdapter extends DirectedPseudograph<NodeWrapper, EdgeWrapper> 
                 }
                 //ugly
                 NodeWrapper endNode = clone.getEdgeTarget(clone.outgoingEdgesOf(loopExitNode).stream().filter(e -> e.label.equals(CONTROL)).findFirst().get());
-                var mergeNodeEdge = clone.outgoingEdgesOf(endNode).stream().filter(e -> e.label.equals(CONTROL)).findFirst().get();
-                NodeWrapper mergeNode = clone.getEdgeTarget(mergeNodeEdge);
+                var mergeNodeEdge = clone.outgoingEdgesOf(endNode).stream().filter(e -> e.label.equals(CONTROL)).findFirst();
+                if(mergeNodeEdge.isEmpty()){
+                   continue;
+                }
+                NodeWrapper mergeNode = clone.getEdgeTarget(mergeNodeEdge.get());
 
                 NodeWrapper otherEndNode = clone.getEdgeSource(clone.incomingEdgesOf(mergeNode).stream().filter(e -> e.getLabel().equals(CONTROL) && !e.equals(mergeNodeEdge)).findFirst().get());
                 EdgeWrapper unrolledBeginIfEdge = clone.incomingEdgesOf(otherEndNode).stream().findFirst().get();
