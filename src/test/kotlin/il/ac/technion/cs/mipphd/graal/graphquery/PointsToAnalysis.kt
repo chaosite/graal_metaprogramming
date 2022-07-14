@@ -149,22 +149,22 @@ fun anyHolder(param: String?): AnyHolder {
 }
 
 fun anyHolder2(param: String?): AnyHolder {
-    val first = AnyHolder()
+    val first = AnyHolder() // alloc 85
     anyUser(first) // order is important - otherwise it will be optimized away and there will be no stores
     first.any = param ?: "" // param0, const"", alloc line 151
     first.other = null // const null
 
-    val second = AnyHolder()
+    val second = AnyHolder() // alloc 89
     anyUser(second)
     second.any = first // alloc line 151
     second.other = param ?: "" // param0, const"", alloc line 156
 
-    val third = AnyHolder()
+    val third = AnyHolder() // alloc 93
     anyUser(third)
     third.any = second // alloc line 156
     third.other = null // const null
 
-    val fourth = AnyHolder()
+    val fourth = AnyHolder() // alloc 97
     anyUser(fourth)
     fourth.any = second.other
     fourth.other = third.any
@@ -513,7 +513,6 @@ digraph G {
             }.joinToString("\n"))
         }
 
-
         @Test
         fun `get pointsto graph preliminaries of anyHolder2`() {
             val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
@@ -568,7 +567,8 @@ digraph G {
                 }
             }
             val resultsFieldAssoc = fieldAssociationQuery.iterateUntilFixedPoint()
-            val itemsFieldAssoc = resultsFieldAssoc.toList().sortedBy { it.first.id }.filter { it.first.node is StoreFieldNode }
+            val itemsFieldAssoc =
+                resultsFieldAssoc.toList().sortedBy { it.first.id }.filter { it.first.node is StoreFieldNode }
             for (item in itemsFieldAssoc) {
                 println(item)
             }
@@ -583,8 +583,12 @@ digraph G {
                     val value = mutableListOf<NodeWrapper>()
                     for (node in (items.firstOrNull { it.first == itt.first }?.second ?: listOf())) {
                         if (node.node is LoadFieldNode) {
-                            value.add(GenericObjectWithField(resultsFieldAssoc.toList().first { it.first == node }.second,
-                                fieldNameMethod(fieldMethod(node.node)) as String))
+                            value.add(
+                                GenericObjectWithField(
+                                    resultsFieldAssoc.toList().first { it.first == node }.second,
+                                    fieldNameMethod(fieldMethod(node.node)) as String
+                                )
+                            )
                         } else value.add(node)
                     }
                     key to value
@@ -592,6 +596,100 @@ digraph G {
             for (item in associated) {
                 println(item)
             } // todo next: figure out why it sometimes adds itself to references
+        }
+
+        @Test
+        fun `get pointsto graph of anyHolder2`() {
+            val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
+            val graph = GraalAdapter.fromGraal(cfg)
+            val nopNodes = listOf(
+                "Pi",
+                "VirtualInstance",
+                "ValuePhi",
+                "Begin",
+                "Merge",
+                "End",
+                "FrameState",
+                "VirtualObjectState",
+                "MaterializedObjectState"
+            ).map { if (it.endsWith("State")) it else "${it}Node" }
+
+            val storeSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
+                val storeQuery by """
+digraph G {
+    storeNode [ label="(?P<store>)|is('StoreFieldNode')" ];
+    nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
+	value [ label="(?P<value>)|${nopNodes.joinToString(" and ") { "not is('$it')" }}" ];
+
+	value -> nop [ label="*|is('DATA') and not (name() = 'object')" ];
+    nop -> storeNode [ label="name() = 'value'" ];
+}
+"""
+                val storeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    state[captureGroups["store"]!!.first()]?.addAll(captureGroups["value"]!!)
+                        ?: (captureGroups["value"]!!.toMutableSet()
+                            .also { state[captureGroups["store"]!!.first()] = it })
+                    Unit
+                }
+            }
+            val results = storeSiteQuery.iterateUntilFixedPoint()
+            val items = results.toList().sortedBy { it.first.id }
+
+            val fieldAssociationQuery = object : QueryExecutor<NodeWrapper?>(graph, { null }) {
+                val assocQuery by """
+digraph G {
+    storeNode [ label="(?P<store>)|is('StoreFieldNode') or is('LoadFieldNode')" ];
+	value [ label="(?P<value>)|is('AllocatedObjectNode')" ];
+
+	value -> storeNode [ label="name() = 'object'" ];
+}
+"""
+                val assocQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                    state[captureGroups["store"]!!.first()] = captureGroups["value"]!!.first()
+                }
+            }
+            val resultsFieldAssoc = fieldAssociationQuery.iterateUntilFixedPoint()
+            val itemsFieldAssoc =
+                resultsFieldAssoc.toList().sortedBy { it.first.id }.filter { it.first.node is StoreFieldNode }
+
+            val clazz = Class.forName("org.graalvm.compiler.nodes.java.AccessFieldNode")
+            val fieldMethod = clazz.getDeclaredMethod("field")
+            val fieldClazz = Class.forName("jdk.vm.ci.meta.JavaField")
+            val fieldNameMethod = fieldClazz.getDeclaredMethod("getName")
+            val associated = itemsFieldAssoc.associate { itt ->
+                val key = GenericObjectWithField(itt.second, fieldNameMethod(fieldMethod(itt.first.node)) as String)
+                val value = mutableListOf<NodeWrapper>()
+                for (node in (items.firstOrNull { it.first == itt.first }?.second ?: listOf())) {
+                    if (node.node is LoadFieldNode) {
+                        value.add(
+                            GenericObjectWithField(
+                                resultsFieldAssoc.toList().first { it.first == node }.second,
+                                fieldNameMethod(fieldMethod(node.node)) as String
+                            )
+                        )
+                    } else value.add(node)
+                }
+                key to value
+            }
+            var i = 1
+            val nodes = associated.flatMap { it.value }.toSet().union(associated.keys).associateWith { i++ }
+            val edges = mutableListOf<Pair<NodeWrapper, NodeWrapper>>()
+            associated.forEach { item ->
+                edges.addAll(item.value.map { item.key to it })
+            }
+            val edgesStrings = edges.map { (from, to) ->
+                val fromId = nodes[from]!!
+                val toId = nodes[to]!!
+                "$fromId -> $toId"
+            }
+            val graphFormat = """
+digraph G {
+${nodes.entries.joinToString("\n") { "    ${it.value} [label=\"${it.key.toString().replace("\"", "'")}\"];" }}
+${edgesStrings.joinToString("\n") { "    $it [ color=\"${if(edgesStrings.count { itt-> itt.split(" -> ")[0] == it.split(" -> ")[0] } == 1) "blue" else "red"}\" ];" }}
+}
+            """
+            println(graphFormat)
+
         }
     }
 }
