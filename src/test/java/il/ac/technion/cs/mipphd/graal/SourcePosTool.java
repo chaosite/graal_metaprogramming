@@ -17,7 +17,7 @@ public class SourcePosTool {
         return node.getNodeSourcePosition().getMethod();
     }
 
-    static StackTraceElement getStackTraceElement(ValueNode node) {
+    public static StackTraceElement getStackTraceElement(ValueNode node) {
         return getMethod(node).asStackTraceElement(getBCI(node));
     }
 }

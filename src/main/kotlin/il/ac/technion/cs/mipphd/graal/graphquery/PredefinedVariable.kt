@@ -41,5 +41,7 @@ val predefined = createMap(
             is QueryTargetEdge -> StringValue(t.edge.name)
         }
     },
-    PredefinedVariable("five", MInteger, IntegerValue(5)) // for debug
+    PredefinedVariable("five", MInteger, IntegerValue(5)), // for debug
+    PredefinedVariable("true", MBoolean, BooleanValue(true)),
+    PredefinedVariable("false", MBoolean, BooleanValue(false)),
 )

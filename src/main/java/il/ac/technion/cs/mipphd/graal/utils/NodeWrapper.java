@@ -4,6 +4,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.graalvm.compiler.graph.Node;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class NodeWrapper {
@@ -41,13 +42,29 @@ public class NodeWrapper {
     }
 
     public Boolean isType(String className) {
-        try {
-            Class<?> cls = Class.forName("org.graalvm.compiler.nodes." + className);
-            return cls.isAssignableFrom(this.getNode().getClass());
-        } catch (ClassNotFoundException e) {
-            // TODO: Do nothing instead?
-            throw new RuntimeException("No such class", e);
+        boolean foundClass = false;
+        String basePackage = "org.graalvm.compiler.nodes";
+        // https://stackoverflow.com/questions/15893174/list-all-subpackages-of-a-package
+        List<Package> packages = Arrays.stream(Package.getPackages())
+                .filter(p -> p.getName().startsWith(basePackage))
+                .toList();
+        for (Package p : packages) {
+            try {
+                Class<?> clazz = Class.forName(p.getName() + "." + className);
+                foundClass = true;
+                if (clazz.isAssignableFrom(node.getClass())) {
+                    return true;
+                }
+            } catch (ClassNotFoundException e) {
+                // ignore
+            }
+
         }
+        if (!foundClass) {
+            // TODO: Do nothing instead?
+            throw new RuntimeException("No such class " + className);
+        }
+        return false;
     }
 
     public int getId() {
