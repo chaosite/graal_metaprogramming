@@ -1,6 +1,6 @@
 plugins {
     java
-    kotlin("jvm") version "1.6.10"
+    kotlin("jvm") version "1.7.0"
 }
 
 group = "il.ac.technion.cs"
@@ -16,12 +16,15 @@ val graalVersion = "22.1.0"
 val jgraphtVersion = "1.5.1"
 val junitVersion = "5.8.2"
 
+val apron_location = "/home/mip/phd/repos/apron/prefix"
+val elina_location = "/home/mip/phd/repos/ELINA"
+
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation(kotlin("reflect"))
 
     // ReactiveX
-    implementation("io.reactivex.rxjava3:rxjava:3.1.4")
+    implementation("io.reactivex.rxjava3:rxjava:3.1.5")
     implementation("io.reactivex.rxjava3:rxkotlin:3.0.1")
 
     // Arrow (should use sparingly?)
@@ -45,18 +48,19 @@ dependencies {
     // JSON parser/builder
     implementation("com.beust:klaxon:5.6")
 
-    // Elina
-    //implementation(files("libs/gmp.jar", "libs/apron.jar"))
-    //implementation(files("libs/gmp.jar"))
-    //implementation(files("libs/apron.jar", "libs/gmp.jar", "libs/elina.jar"))
-    //implementation(files("libs/gmp.jar", "libs/apron.jar", "libs/elina.jar"))
-    // runtimeOnly(files("libs/gmp.jar", "libs/apron.jar", "libs/elina.jar"))
+    if (File(apron_location).isDirectory) {
+        implementation(files("$apron_location/lib/gmp.jar", "$apron_location/lib/apron.jar"))
+    }
 
-    testImplementation("org.assertj:assertj-core:3.22.0")
+    if (File(elina_location).isDirectory) {
+        implementation(files("$elina_location/java_interface/elina.jar"))
+    }
+
+    testImplementation("org.assertj:assertj-core:3.23.1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
     testImplementation("org.amshove.kluent:kluent:1.68")
-    testImplementation("io.mockk:mockk:1.12.3")
+    testImplementation("io.mockk:mockk:1.12.4")
 }
 
 val moduleArgs = listOf(
@@ -115,8 +119,18 @@ tasks {
 
     test {
         useJUnitPlatform()
-        jvmArgs = moduleArgs + listOf("-Ddebug.graal.TrackNodeCreationPosition=true", "--add-opens", "jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED",)
+        jvmArgs = moduleArgs + listOf(
+            "-Ddebug.graal.TrackNodeCreationPosition=true",
+            "--add-opens",
+            "jdk.internal.vm.compiler/org.graalvm.compiler.graph=ALL-UNNAMED",
+        )
         maxHeapSize = "8g"
-        systemProperty("java.library.path", "/usr/local/lib")
+        var libraryPath = "/usr/local/lib"
+        if (File(apron_location).exists())
+            libraryPath += ":$apron_location/lib"
+        if (File(elina_location).exists())
+            libraryPath += ":$elina_location/lib"
+        systemProperty("java.library.path", libraryPath)
+        environment("LD_LIBRARY_PATH", libraryPath)
     }
 }
