@@ -65,7 +65,7 @@ dependencies {
 
 val moduleArgs = listOf(
     "--add-modules", "jdk.internal.vm.ci,jdk.internal.vm.compiler",
-    "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED,jdk.internal.vm.compiler",
+    "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED", // diff
     "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.services=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.runtime=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
@@ -76,6 +76,7 @@ val moduleArgs = listOf(
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.runtime=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.core.target=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.cfg=ALL-UNNAMED",
+    "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.virtual=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodeinfo=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.phases.tiers=ALL-UNNAMED",
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.phases=ALL-UNNAMED",

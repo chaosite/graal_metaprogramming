@@ -255,8 +255,9 @@ val mGrammar = object : Grammar<MQuery>() {
             (lbra * rbra) asJust MetadataOption.Repeated)
 
     val metadata: Parser<MQuery> by (
-            oneOrMore(option) * -pipe * orChain map { Metadata(it.t2, it.t1) }) or
-            (orChain map { Metadata(it) })
+            oneOrMore(option) * -pipe * orChain map { Metadata(it.t2, it.t1) }) or // "*|is("Node")"
+            (orChain map { Metadata(it) }) or // "is("Node")"
+            (oneOrMore(option) * -pipe map { Metadata(BooleanValue(true), it)}) // "*|"
 
     override val rootParser by metadata
 }
