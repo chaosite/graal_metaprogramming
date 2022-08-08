@@ -6,6 +6,7 @@ import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import org.graalvm.compiler.nodes.PhiNode
 import org.graalvm.compiler.nodes.ValuePhiNode
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import kotlin.reflect.jvm.javaMethod
 
@@ -99,10 +100,61 @@ internal class GenericBFSTest {
     }
 
     @Test
+    fun `bfsMatch doesn't return extra node in match`() {
+        val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
+        val graph = GraalAdapter.fromGraal(cfg)
+
+        val nopNodes = listOf(
+            "Pi",
+            "VirtualInstance",
+            "ValuePhi",
+            "VirtualObjectState",
+            "MaterializedObjectState"
+        ).map { if (it.endsWith("State")) it else "${it}Node" }
+        val notValueNodes = listOf(
+            "Pi",
+            "VirtualInstance",
+            "ValuePhi",
+            "Begin",
+            "Merge",
+            "End",
+            "FrameState",
+            "VirtualObjectState",
+            "MaterializedObjectState"
+        ).map { if (it.endsWith("State")) it else "${it}Node" }
+        val query = GraphQuery.importQuery("""
+digraph G {
+    storeNode [ label="(?P<store>)|is('StoreFieldNode')" ];
+    nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
+	value [ label="(?P<value>)|${notValueNodes.joinToString(" and ") { "not is('$it')" }}" ];
+
+	value -> nop [ label="*|is('DATA')" ];
+    nop -> storeNode [ label="name() = 'value'" ];
+}
+""")
+        val results = bfsMatch(query, graph, query.vertexSet().last())
+
+        val store = query.vertexSet().find { it.name == "storeNode" }!!
+        val nop = query.vertexSet().find { it.name == "nop" }!!
+        val value = query.vertexSet().find { it.name == "value" }!!
+
+        for (result in results) {
+            println("===")
+            println("${result[store]}")
+            println("${result[nop]}")
+            println("${result[value]}")
+            println()
+            assertNotEquals(result[value], result[store])
+        }
+    }
+
+    @Test
+    @Disabled
     fun permutations() {
     }
 
     @Test
+    @Disabled
     fun cartesianProduct() {
     }
 }
