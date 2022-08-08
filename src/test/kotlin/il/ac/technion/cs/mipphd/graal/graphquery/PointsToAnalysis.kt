@@ -521,6 +521,13 @@ digraph G {
                 "Pi",
                 "VirtualInstance",
                 "ValuePhi",
+                "VirtualObjectState",
+                "MaterializedObjectState"
+            ).map { if (it.endsWith("State")) it else "${it}Node" }
+            val notValueNodes = listOf(
+                "Pi",
+                "VirtualInstance",
+                "ValuePhi",
                 "Begin",
                 "Merge",
                 "End",
@@ -534,7 +541,7 @@ digraph G {
 digraph G {
     storeNode [ label="(?P<store>)|is('StoreFieldNode')" ];
     nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
-	value [ label="(?P<value>)|${nopNodes.joinToString(" and ") { "not is('$it')" }}" ];
+	value [ label="(?P<value>)|${notValueNodes.joinToString(" and ") { "not is('$it')" }}" ];
 
 	value -> nop [ label="*|is('DATA')" ];
     nop -> storeNode [ label="name() = 'value'" ];
@@ -606,6 +613,13 @@ digraph G {
                 "Pi",
                 "VirtualInstance",
                 "ValuePhi",
+                "VirtualObjectState",
+                "MaterializedObjectState"
+            ).map { if (it.endsWith("State")) it else "${it}Node" }
+            val notValueNodes = listOf(
+                "Pi",
+                "VirtualInstance",
+                "ValuePhi",
                 "Begin",
                 "Merge",
                 "End",
@@ -613,13 +627,12 @@ digraph G {
                 "VirtualObjectState",
                 "MaterializedObjectState"
             ).map { if (it.endsWith("State")) it else "${it}Node" }
-
             val storeSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
                 val storeQuery by """
 digraph G {
     storeNode [ label="(?P<store>)|is('StoreFieldNode')" ];
     nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
-	value [ label="(?P<value>)|${nopNodes.joinToString(" and ") { "not is('$it')" }}" ];
+	value [ label="(?P<value>)|${notValueNodes.joinToString(" and ") { "not is('$it')" }}" ];
 
 	value -> nop [ label="*|is('DATA') and not (name() = 'object')" ];
     nop -> storeNode [ label="name() = 'value'" ];
