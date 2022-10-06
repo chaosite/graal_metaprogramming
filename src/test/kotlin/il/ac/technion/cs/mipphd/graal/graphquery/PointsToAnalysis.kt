@@ -4,7 +4,6 @@ import il.ac.technion.cs.mipphd.graal.SourcePosTool
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
-import org.graalvm.compiler.graph.Node
 import org.graalvm.compiler.nodes.ValueNode
 import org.graalvm.compiler.nodes.java.LoadFieldNode
 import org.graalvm.compiler.nodes.java.StoreFieldNode
@@ -261,12 +260,11 @@ internal class PointsToAnalysis {
                 VirtualInstanceNode::class.java.getDeclaredMethod("type") // ()->ResolvedJavaType, escaping module issues
             val nameFromJavaTypeMethod = Class.forName("jdk.vm.ci.meta.JavaType").getDeclaredMethod("getName")
             val analyzer = object : QueryExecutor<String>(graph, { "" }) {
-                val virtualQuery by """
+                val virtualQuery by CaptureGroupQuery("""
 digraph G {
     n [ label="(?P<virtual>)|is('VirtualInstanceNode')" ];
 }
-"""
-                val virtual: CaptureGroupAction<String> by { nodes: List<NodeWrapper> ->
+""", "virtual" to { nodes: List<NodeWrapper> ->
                     val node = nodes.first().node as VirtualInstanceNode
                     val stacktrace = SourcePosTool.getStackTraceElement(node)
                     val typeName = (nameFromJavaTypeMethod(typeMethod(node)) as String)
@@ -274,7 +272,7 @@ digraph G {
                         .split("/").joinToString(".")
                     "allocation of $typeName at ${stacktrace.className}.${stacktrace.methodName}:${stacktrace.lineNumber}"
 //                    (node.node as VirtualInstanceNode).creationPosition.toString()// objectId.toString() // object ID from cfg
-                }
+                })
             }
             val results = analyzer.iterateUntilFixedPoint()
             val items = results.toList().asSequence().sortedBy { it.first.id }.map { it.second }
@@ -303,7 +301,8 @@ digraph G {
                 // Change "query is not weakly connected" error to "missing edges in query" or something like that
                 // Allow accessing of query results separately
                 // A metafunction: length of kleene star path
-                val loadQuery by """
+                val loadQuery by WholeMatchQuery(
+                    """
 digraph G {
 	loadField [ label="(?P<loadfield>)|is('java.LoadFieldNode')" ];
     nop [ label="(?P<nop>)|is('PiNode')" ];
@@ -313,7 +312,7 @@ digraph G {
     nop -> loadField [ label="is('DATA')" ];
 }
 """
-                val loadQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     val loadField = captureGroups.getValue("loadfield").first()
                     val value = captureGroups.getValue("value").first()
 
@@ -331,7 +330,8 @@ digraph G {
                     }"
                 }
 
-                val storeQuery by """
+                val storeQuery by WholeMatchQuery(
+                    """
 digraph G {
 	storeField [ label="(?P<storefield>)|is('java.StoreFieldNode')" ];
 	value [ label="(?P<value>)|1 = 1" ];
@@ -339,7 +339,7 @@ digraph G {
 	value -> storeField [ label="is('DATA') and name() = 'value'" ];
 }
 """
-                val storeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     val storeField = captureGroups.getValue("storefield").first()
                     val value = captureGroups.getValue("value").first()
 
@@ -408,7 +408,8 @@ digraph G {
                 .map { if (it.endsWith("State")) it else "${it}Node" }
             // actually, we do want to search for CommitAllocation and not VirtualInstance because CommitAllocation is where the parameters come in
             val constructorCallSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
-                val virtualQuery by """
+                val virtualQuery by WholeMatchQuery(
+                    """
 digraph G {
     commitAllocNode [ label="(?P<alloc>)|is('CommitAllocationNode')" ];
     nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
@@ -418,7 +419,7 @@ digraph G {
     nop -> commitAllocNode [ label="is('DATA')" ];
 }
 """ // value -> nop [ label="*|is('DATA') and name() = 'object'" ];
-                val virtualQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     state[captureGroups["alloc"]!!.first()]?.addAll(captureGroups["value"]!!)
                         ?: (captureGroups["value"]!!.toMutableSet()
                             .also { state[captureGroups["alloc"]!!.first()] = it })
@@ -432,7 +433,8 @@ digraph G {
             }
             println()
             val associationQuery = object : QueryExecutor<NodeWrapper?>(graph, { null }) {
-                val virtualQuery by """
+                val virtualQuery by WholeMatchQuery(
+                    """
 digraph G {
     commitAllocNode [ label="(?P<alloc>)|is('CommitAllocationNode')" ];
 	allocatedObjNode [ label="(?P<obj>)|is('AllocatedObjectNode')" ];
@@ -440,7 +442,7 @@ digraph G {
     commitAllocNode -> allocatedObjNode [ label="is('DATA')" ];
 }
 """
-                val virtualQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     state[captureGroups["obj"]!!.first()] = captureGroups["alloc"]!!.first()
                 }
             }
@@ -469,7 +471,8 @@ digraph G {
             val graph = GraalAdapter.fromGraal(cfg)
             // actually, we do want to search for CommitAllocation and not VirtualInstance because CommitAllocation is where the parameters come in
             val constructorCallSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
-                val virtualQuery by """
+                val virtualQuery by WholeMatchQuery(
+                    """
 digraph G {
     commitAllocNode [ label="(?P<alloc>)|is('CommitAllocationNode')" ];
     nop [ label="(?P<nop>)|is('PiNode') or is('VirtualInstanceNode')" ];
@@ -481,7 +484,7 @@ digraph G {
     nop -> commitAllocNode [ label="is('DATA')" ];
 }
 """
-                val virtualQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     state[captureGroups["alloc"]!!.first()]?.addAll(captureGroups["allocOrig"]!!)
                         ?: (captureGroups["allocOrig"]!!.toMutableSet()
                             .also { state[captureGroups["alloc"]!!.first()] = it })
@@ -537,7 +540,8 @@ digraph G {
             ).map { if (it.endsWith("State")) it else "${it}Node" }
 
             val storeSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
-                val storeQuery by """
+                val storeQuery by WholeMatchQuery(
+                    """
 digraph G {
     storeNode [ label="(?P<store>)|is('StoreFieldNode')" ];
     nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
@@ -547,7 +551,7 @@ digraph G {
     nop -> storeNode [ label="name() = 'value'" ];
 }
 """
-                val storeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     state[captureGroups["store"]!!.first()]?.addAll(captureGroups["value"]!!)
                         ?: (captureGroups["value"]!!.toMutableSet()
                             .also { state[captureGroups["store"]!!.first()] = it })
@@ -561,7 +565,8 @@ digraph G {
             }
             println()
             val fieldAssociationQuery = object : QueryExecutor<NodeWrapper?>(graph, { null }) {
-                val assocQuery by """
+                val assocQuery by WholeMatchQuery(
+                    """
 digraph G {
     storeNode [ label="(?P<store>)|is('StoreFieldNode') or is('LoadFieldNode')" ];
 	value [ label="(?P<value>)|is('AllocatedObjectNode')" ];
@@ -569,7 +574,7 @@ digraph G {
 	value -> storeNode [ label="name() = 'object'" ];
 }
 """
-                val assocQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     state[captureGroups["store"]!!.first()] = captureGroups["value"]!!.first()
                 }
             }
@@ -628,7 +633,8 @@ digraph G {
                 "MaterializedObjectState"
             ).map { if (it.endsWith("State")) it else "${it}Node" }
             val storeSiteQuery = object : QueryExecutor<MutableSet<NodeWrapper>>(graph, { mutableSetOf() }) {
-                val storeQuery by """
+                val storeQuery by WholeMatchQuery(
+                    """
 digraph G {
     storeNode [ label="(?P<store>)|is('StoreFieldNode')" ];
     nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
@@ -638,7 +644,7 @@ digraph G {
     nop -> storeNode [ label="name() = 'value'" ];
 }
 """
-                val storeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     state[captureGroups["store"]!!.first()]?.addAll(captureGroups["value"]!!)
                         ?: (captureGroups["value"]!!.toMutableSet()
                             .also { state[captureGroups["store"]!!.first()] = it })
@@ -649,7 +655,8 @@ digraph G {
             val items = results.toList().sortedBy { it.first.id }
 
             val fieldAssociationQuery = object : QueryExecutor<NodeWrapper?>(graph, { null }) {
-                val assocQuery by """
+                val assocQuery by WholeMatchQuery(
+                    """
 digraph G {
     storeNode [ label="(?P<store>)|is('StoreFieldNode') or is('LoadFieldNode')" ];
 	value [ label="(?P<value>)|is('AllocatedObjectNode')" ];
@@ -657,7 +664,7 @@ digraph G {
 	value -> storeNode [ label="name() = 'object'" ];
 }
 """
-                val assocQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+                ) { captureGroups: Map<String, List<NodeWrapper>> ->
                     state[captureGroups["store"]!!.first()] = captureGroups["value"]!!.first()
                 }
             }
@@ -698,7 +705,17 @@ digraph G {
             val graphFormat = """
 digraph G {
 ${nodes.entries.joinToString("\n") { "    ${it.value} [label=\"${it.key.toString().replace("\"", "'")}\"];" }}
-${edgesStrings.joinToString("\n") { "    $it [ color=\"${if(edgesStrings.count { itt-> itt.split(" -> ")[0] == it.split(" -> ")[0] } == 1) "blue" else "red"}\" ];" }}
+${
+                edgesStrings.joinToString("\n") {
+                    "    $it [ color=\"${
+                        if (edgesStrings.count { itt ->
+                                itt.split(" -> ")[0] == it.split(
+                                    " -> "
+                                )[0]
+                            } == 1) "blue" else "red"
+                    }\" ];"
+                }
+            }
 }
             """
             println(graphFormat)
