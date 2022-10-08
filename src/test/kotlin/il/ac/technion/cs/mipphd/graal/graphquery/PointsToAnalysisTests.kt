@@ -66,7 +66,7 @@ class PointsToAnalysisTests {
         fun `get pointsto graph preliminaries of anyHolder`() {
             val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
             val graph = GraalAdapter.fromGraal(cfg)
-            val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiaries()
+            val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiariesForDebug()
             values.filter { it.first.node is StoreFieldNode }.forEach(::println)
             println()
             allocations.forEach(::println)
@@ -81,15 +81,15 @@ class PointsToAnalysisTests {
             val (nodes, edges) = PointsToAnalysis(graph).getPointsToGraph()
             var i = 1
             val numberedNodes = nodes.associateWith { i++ }
-            val edgesStrings = edges.map { (from, to) ->
+            val edgesStrings = edges.map { (from, field, to) ->
                 val fromId = numberedNodes[from]!!
                 val toId = numberedNodes[to]!!
-                "$fromId -> $toId"
+                "    $fromId -> $toId [ label=\"$field\" ];"
             }
             val graphFormat = """
 digraph G {
 ${numberedNodes.entries.joinToString("\n") { "    ${it.value} [label=\"${it.key.toString().replace("\"", "'")}\"];" }}
-${edgesStrings.joinToString("\n") { "    $it [ color=\"${if(edgesStrings.count { itt-> itt.split(" -> ")[0] == it.split(" -> ")[0] } == 1) "blue" else "red"}\" ];" }}
+${edgesStrings.joinToString("\n")}
 }
             """
             println(graphFormat)
@@ -116,7 +116,7 @@ ${edgesStrings.joinToString("\n") { "    $it [ color=\"${if(edgesStrings.count {
         fun `get pointsto graph preliminaries of anyHolder2`() {
             val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
             val graph = GraalAdapter.fromGraal(cfg)
-            val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiaries()
+            val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiariesForDebug()
             values.filter { it.first.node is StoreFieldNode }.forEach(::println)
             println()
             allocations.forEach(::println)
@@ -131,15 +131,15 @@ ${edgesStrings.joinToString("\n") { "    $it [ color=\"${if(edgesStrings.count {
             val (nodes, edges) = PointsToAnalysis(graph).getPointsToGraph()
             var i = 1
             val numberedNodes = nodes.associateWith { i++ }
-            val edgesStrings = edges.map { (from, to) ->
+            val edgesStrings = edges.map { (from, field, to) ->
                 val fromId = numberedNodes[from]!!
                 val toId = numberedNodes[to]!!
-                "$fromId -> $toId"
+                "    $fromId -> $toId [ label=\"$field\" ];"
             }
             val graphFormat = """
 digraph G {
 ${numberedNodes.entries.joinToString("\n") { "    ${it.value} [label=\"${it.key.toString().replace("\"", "'")}\"];" }}
-${edgesStrings.joinToString("\n") { "    $it [ color=\"${if(edgesStrings.count { itt-> itt.split(" -> ")[0] == it.split(" -> ")[0] } == 1) "blue" else "red"}\" ];" }}
+${edgesStrings.joinToString("\n")}
 }
             """
             println(graphFormat)
