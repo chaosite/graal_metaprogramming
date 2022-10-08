@@ -4,9 +4,25 @@ import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import kotlin.reflect.KProperty
 
-typealias CaptureGroupAction<T> = (List<NodeWrapper>) -> T?
-typealias WholeMatchAction = (Map<String, List<NodeWrapper>>) -> Unit
-typealias GraphQueryMatch = Map<GraphQueryVertex<*>, List<NodeWrapper>>
+private typealias CaptureGroupAction<T> = (List<NodeWrapper>) -> T?
+private typealias CGAItem<T> = Pair<String, CaptureGroupAction<T>>
+private typealias CaptureGroupActions<T> = Map<String, CaptureGroupAction<T>>
+private typealias WholeMatchAction = (Map<String, List<NodeWrapper>>) -> Unit
+private typealias GraphQueryMatch = Map<GraphQueryVertex<*>, List<NodeWrapper>>
+
+data class WholeMatchQuery(val query: GraphQuery, val action: WholeMatchAction) {
+    constructor(query: String, action: WholeMatchAction) : this(GraphQuery.importQuery(query), action)
+}
+
+data class CaptureGroupQuery<T>(val query: GraphQuery, val action: CaptureGroupActions<T>) {
+    companion object {
+        fun <T> associate(a: Array<out CGAItem<T>>) = a.associate { it }
+    }
+
+    constructor(query: GraphQuery, vararg actions: CGAItem<T>) : this(query, associate(actions))
+
+    constructor(query: String, vararg actions: CGAItem<T>) : this(GraphQuery.importQuery(query), associate(actions))
+}
 
 abstract class QueryExecutor<T>(
     val graph: GraalAdapter,
@@ -26,42 +42,31 @@ abstract class QueryExecutor<T>(
         }
     }
 
-    private val _captureGroupActions = linkedMapOf<String, CaptureGroupAction<T>>()
+    private val _captureGroupActions = linkedMapOf<String, CaptureGroupActions<T>>()
     private val _wholeMatchActions = linkedMapOf<String, WholeMatchAction>()
     private val _queries = linkedMapOf<String, GraphQuery>()
     protected var hasChanged: Boolean = false
-    open val captureGroupActions: Map<String, CaptureGroupAction<T>> get() = _captureGroupActions.toMap()
+    open val captureGroupActions: Map<String, CaptureGroupActions<T>> get() = _captureGroupActions.toMap()
     open val wholeMatchActions: Map<String, WholeMatchAction> get() = _wholeMatchActions.toMap()
     open val queries: Map<String, GraphQuery> get() = _queries.toMap()
     open var state: MutableMap<NodeWrapper, T> = MapProxy(hashMapOf<NodeWrapper, T>()).withDefault { initializer() }
 
-    protected operator fun CaptureGroupAction<T>.provideDelegate(thisRef: QueryExecutor<T>, property: KProperty<*>) =
+    protected operator fun CaptureGroupQuery<T>.provideDelegate(thisRef: QueryExecutor<T>, property: KProperty<*>) =
         also {
-            _captureGroupActions[property.name] = this
+            _queries[property.name] = this.query
+            _captureGroupActions[property.name] = this.action
         }
 
-    protected operator fun CaptureGroupAction<T>.getValue(thisRef: QueryExecutor<T>, property: KProperty<*>) = this
+    protected operator fun CaptureGroupQuery<T>.getValue(thisRef: QueryExecutor<T>, property: KProperty<*>) = this
 
-    @JvmName("WholeMatchAction_provideDelegate")
-    protected operator fun WholeMatchAction.provideDelegate(thisRef: QueryExecutor<T>, property: KProperty<*>) = also {
-        _wholeMatchActions[property.name] = this
+    @JvmName("WholeMatchQuery_provideDelegate")
+    protected operator fun WholeMatchQuery.provideDelegate(thisRef: QueryExecutor<T>, property: KProperty<*>) = also {
+        _queries[property.name] = this.query
+        _wholeMatchActions[property.name] = this.action
     }
 
-    @JvmName("WholeMatchAction_getValue")
-    protected operator fun WholeMatchAction.getValue(thisRef: QueryExecutor<T>, property: KProperty<*>) = this
-
-    protected operator fun GraphQuery.provideDelegate(thisRef: QueryExecutor<T>, property: KProperty<*>) = also {
-        _queries[property.name] = this
-    }
-
-    protected operator fun GraphQuery.getValue(thisRef: QueryExecutor<T>, property: KProperty<*>) = this
-
-    /* TODO: Is this actually a good idea? */
-    protected operator fun String.provideDelegate(thisRef: QueryExecutor<T>, property: KProperty<*>) = also {
-        _queries[property.name] = GraphQuery.importQuery(this)
-    }
-
-    protected operator fun String.getValue(thisRef: QueryExecutor<T>, property: KProperty<*>) = this
+    @JvmName("WholeMatchQuery_getValue")
+    protected operator fun WholeMatchQuery.getValue(thisRef: QueryExecutor<T>, property: KProperty<*>) = this
 
     fun iterateUntilFixedPoint(limit: Int = 50): Map<NodeWrapper, T> {
         val matches: List<Pair<String, GraphQueryMatch>> = queries
@@ -70,7 +75,7 @@ abstract class QueryExecutor<T>(
         state = MapProxy(hashMapOf<NodeWrapper, T>()).withDefault { initializer() }
         for (i in 0..limit) {
             hasChanged = false
-            matches.asSequence().map(this::executeWithState).forEach(state::putAll)
+            matches.asSequence().map(this::execute).forEach(state::putAll)
             if (!hasChanged)
                 break
 
@@ -78,21 +83,18 @@ abstract class QueryExecutor<T>(
         return state
     }
 
-    private fun executeWithState(namedMatch: Pair<String, GraphQueryMatch>): Map<NodeWrapper, T> {
+    private fun execute(namedMatch: Pair<String, GraphQueryMatch>): Map<NodeWrapper, T> {
         val (name, match) = namedMatch
-        wholeMatchActions["${name}Action"]?.invoke(match.filter { it.key.captureGroup().isPresent }
+        wholeMatchActions[name]?.invoke(match.filter { it.key.captureGroup().isPresent }
             .mapKeys { it.key.captureGroup().get() })
-        return execute(match)
-    }
-
-    private fun execute(match: GraphQueryMatch): Map<NodeWrapper, T> =
-        match.entries.asSequence()
-            .filter { it.key.captureGroup().isPresent && captureGroupActions.containsKey(it.key.captureGroup().get()) }
+        return match.entries.asSequence()
+            .filter { it.key.captureGroup().isPresent && (captureGroupActions[name]?.containsKey(it.key.captureGroup().get()) ?: false) }
             .flatMap { (queryVertex, nodes) ->
-                val ret = captureGroupActions[queryVertex.captureGroup().get()]!!.invoke(nodes)
+                // queryVertex.captureGroup().get()
+                val ret = captureGroupActions[name]!![queryVertex.captureGroup().get()]!!.invoke(nodes)
                 nodes.map { node -> Pair(node, ret) }
             }
-            .filter { it.second != null }
             .filterIsInstance<Pair<NodeWrapper, T>>()
             .toMap()
+    }
 }

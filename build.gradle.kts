@@ -1,6 +1,6 @@
 plugins {
     java
-    kotlin("jvm") version "1.7.0"
+    kotlin("jvm") version "1.7.20"
 }
 
 group = "il.ac.technion.cs"
@@ -12,12 +12,12 @@ allprojects {
     }
 }
 
-val graalVersion = "22.1.0"
+val graalVersion = "22.2.0"
 val jgraphtVersion = "1.5.1"
-val junitVersion = "5.8.2"
+val junitVersion = "5.9.0"
 
-val apron_location = "/home/mip/phd/repos/apron/prefix"
-val elina_location = "/home/mip/phd/repos/ELINA"
+val apronLocation = "/home/mip/phd/repos/apron/prefix"
+val elinaLocation = "/home/mip/phd/repos/ELINA"
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
@@ -40,7 +40,7 @@ dependencies {
     implementation("org.jgrapht:jgrapht-io:$jgraphtVersion")
 
     // spotbugs annotations (for @NonNull in Java)
-    implementation("com.github.spotbugs:spotbugs-annotations:4.6.0")
+    implementation("com.github.spotbugs:spotbugs-annotations:4.7.2")
 
     // better-parse parser library
     implementation("com.github.h0tk3y.betterParse:better-parse:0.4.4")
@@ -48,19 +48,19 @@ dependencies {
     // JSON parser/builder
     implementation("com.beust:klaxon:5.6")
 
-    if (File(apron_location).isDirectory) {
-        implementation(files("$apron_location/lib/gmp.jar", "$apron_location/lib/apron.jar"))
+    if (File(apronLocation).isDirectory) {
+        implementation(files("$apronLocation/lib/gmp.jar", "$apronLocation/lib/apron.jar"))
     }
 
-    if (File(elina_location).isDirectory) {
-        implementation(files("$elina_location/java_interface/elina.jar"))
+    if (File(elinaLocation).isDirectory) {
+        implementation(files("$elinaLocation/java_interface/elina.jar"))
     }
 
     testImplementation("org.assertj:assertj-core:3.23.1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
     testImplementation("org.amshove.kluent:kluent:1.68")
-    testImplementation("io.mockk:mockk:1.12.4")
+    testImplementation("io.mockk:mockk:1.13.2")
 }
 
 val moduleArgs = listOf(
@@ -127,10 +127,10 @@ tasks {
         )
         maxHeapSize = "8g"
         var libraryPath = "/usr/local/lib"
-        if (File(apron_location).exists())
-            libraryPath += ":$apron_location/lib"
-        if (File(elina_location).exists())
-            libraryPath += ":$elina_location/lib"
+        if (File(apronLocation).exists())
+            libraryPath += ":$apronLocation/lib"
+        if (File(elinaLocation).exists())
+            libraryPath += ":$elinaLocation/lib"
         systemProperty("java.library.path", libraryPath)
         environment("LD_LIBRARY_PATH", libraryPath)
     }

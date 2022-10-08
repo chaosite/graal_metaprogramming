@@ -2,6 +2,7 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
+import org.graalvm.compiler.nodes.ValueNode
 import org.graalvm.compiler.nodes.java.LoadFieldNode
 import org.graalvm.compiler.nodes.java.StoreFieldNode
 

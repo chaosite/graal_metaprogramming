@@ -1,8 +1,8 @@
 package il.ac.technion.cs.mipphd.graal.domains
 
-import il.ac.technion.cs.mipphd.graal.graphquery.CaptureGroupAction
+import il.ac.technion.cs.mipphd.graal.graphquery.CaptureGroupQuery
 import il.ac.technion.cs.mipphd.graal.graphquery.QueryExecutor
-import il.ac.technion.cs.mipphd.graal.graphquery.WholeMatchAction
+import il.ac.technion.cs.mipphd.graal.graphquery.WholeMatchQuery
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapperUtils
@@ -38,7 +38,8 @@ data class Item(
 }
 
 class McCarthy91Analysis(graph: GraalAdapter) : QueryExecutor<Item>(graph, Item::default) {
-    val arithmeticQuery by """
+    val arithmeticQuery by WholeMatchQuery(
+        """
 digraph G {
 	arith [ label="(?P<arithmeticNode>)|" ];
 	x [ label="(?P<x>)|" ];
@@ -48,8 +49,7 @@ digraph G {
 	y -> arith [ label="is('DATA') and name() = 'y'" ];
 }
 """
-
-    val arithmeticQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+    ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val node = captureGroups.getValue("arithmeticNode").first()
         val x = captureGroups.getValue("x").first()
         val y = captureGroups.getValue("y").first()
@@ -60,27 +60,24 @@ digraph G {
 
     private fun arithmeticNodeToText(node: NodeWrapper): String = node.node.toString().replace(Regex("^[^|]*\\|"), "")
 
-    val constantQuery by """
+    val constantQuery by CaptureGroupQuery("""
 digraph G {
     n [ label = "(?P<constant>)|is('ConstantNode')" ];
 }
-"""
-
-    val constant: CaptureGroupAction<Item> by { nodes: List<NodeWrapper> ->
+""", "constant" to  { nodes: List<NodeWrapper> ->
         Item(expression = NodeWrapperUtils.getConstantValue(nodes.first()))
-    }
+    })
 
-    val valuePhiQuery by """
+    val valuePhiQuery by CaptureGroupQuery("""
 digraph G {
     valuephi [ label = "(?P<valuephi>)|is('ValuePhiNode')" ];
 }
-"""
-
-    val valuephi: CaptureGroupAction<Item> by { nodes: List<NodeWrapper> ->
+""", "valuephi" to { nodes: List<NodeWrapper> ->
         Item(expression = "phi${nodes.first().id}")
-    }
+    })
 
-    val valueProxyQuery by """
+    val valueProxyQuery by WholeMatchQuery(
+        """
         digraph G {
             value [ label = "(?P<value>)|1 = 1" ];
             valueProxy [ label = "(?P<valueProxy>)|is('ValueProxyNode')" ];
@@ -88,26 +85,24 @@ digraph G {
             value -> valueProxy [ label = "is('DATA') and name() = 'value'" ];
         }
     """.trimIndent()
-
-    val valueProxyQueryAction: WholeMatchAction by { captures: Map<String, List<NodeWrapper>> ->
+    ) { captures: Map<String, List<NodeWrapper>> ->
         val proxy = captures.getValue("valueProxy").first()
         val value = captures.getValue("value").first()
 
         state[proxy] = state.getValue(proxy).copy(expression = state.getValue(value).expression)
     }
 
-    val parameterQuery by """
+    val parameterQuery by CaptureGroupQuery("""
 digraph G {
     n [ label = "(?P<parameter>)|is('ParameterNode')" ];
 }
-"""
-
-    val parameter: CaptureGroupAction<Item> by { nodes: List<NodeWrapper> ->
+""", "parameter" to { nodes: List<NodeWrapper> ->
         Item(expression = "parameter${nodes.first().id}")
-    }
+    })
 
 
-    val ifConditionQuery by """
+    val ifConditionQuery by WholeMatchQuery(
+        """
 digraph G {
 	ifnode [ label="(?P<ifnode>)|is('IfNode')" ];
 	cmp [ label="(?P<ifcondition>)|" ];
@@ -115,13 +110,14 @@ digraph G {
 	cmp -> ifnode [ label="is('DATA') and name() = 'condition'" ];
 }
 """
-    val ifConditionQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+    ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val node = captureGroups.getValue("ifnode").first()
         val condition = captureGroups.getValue("ifcondition").first()
         state[node] = Item(state.getValue(condition).expression)
     }
 
-    val ifPathQuery by """
+    val ifPathQuery by WholeMatchQuery(
+        """
 digraph G {
     ifnode [ label="(?P<ifpathnode>)|is('IfNode')" ];
     truepath [ label="(?P<truepath>)|" ];
@@ -131,8 +127,7 @@ digraph G {
     ifnode -> falsepath [ label="is('CONTROL') and name() = 'falseSuccessor'" ];
 }
 """
-
-    val ifPathQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+    ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val ifNode = captureGroups.getValue("ifpathnode").first()
         val nextTrue = captureGroups.getValue("truepath").first()
         val nextFalse = captureGroups.getValue("falsepath").first()
@@ -141,7 +136,8 @@ digraph G {
         state[nextFalse] = state.getValue(nextFalse).copy(condition = "!(${state.getValue(ifNode).expression})")
     }
 
-    val frameStateQuery by """
+    val frameStateQuery by WholeMatchQuery(
+        """
 digraph G {
 	framestate [ label="is('FrameState')" ];
 	merge [ label="(?P<mergenode>)|is('AbstractMergeNode')" ];
@@ -154,8 +150,7 @@ digraph G {
 	framestate -> merge [ label = "is('DATA') and name() = 'stateAfter'" ];
 }
 """
-
-    val frameStateQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+    ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val mergeNode = captureGroups.getValue("mergenode").first()
         val values = captureGroups.getValue("phivalues")
         val sourceValues = captureGroups.getValue("phisourcevalues")
@@ -172,20 +167,21 @@ digraph G {
                     assignments.computeIfAbsent(edge.from) { mutableMapOf() }[state.getValue(phi).expression] =
                         state.getValue(value).expression
                 }
-/*                val edge = graph.getEdge(value, phi) as PhiEdgeWrapper?
-                if (edge != null) {
-                    if (edge.from !in map) {
-                        map[edge.from] = mutableMapOf()
-                    }
-                    map.getValue(edge.from)[phi] = value
-                } */
+                /*                val edge = graph.getEdge(value, phi) as PhiEdgeWrapper?
+                                if (edge != null) {
+                                    if (edge.from !in map) {
+                                        map[edge.from] = mutableMapOf()
+                                    }
+                                    map.getValue(edge.from)[phi] = value
+                                } */
             }
         }
         state[mergeNode] =
             state.getValue(mergeNode).copy(relatedValues = values, mergeValues = map, mergeAssignments = assignments)
     }
 
-    val loopQuery by """
+    val loopQuery by WholeMatchQuery(
+        """
 digraph G {
   loopPrev  [ label="(?P<loopPrev>)|not is ('LoopEndNode')" ];
   loopBegin [ label="(?P<loopBegin>)|is('LoopBeginNode')" ];
@@ -200,7 +196,7 @@ digraph G {
   someNodeKleene -> loopEnd [ label="is('CONTROL')"];
 }
 """
-    val loopQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+    ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val begin = captureGroups.getValue("loopBegin").first()
         val prev = captureGroups.getValue("loopPrev").first()
         val end = captureGroups.getValue("loopEnd").first()
@@ -227,7 +223,8 @@ ${values.prependIndent("    ")}
         )
     }
 
-    val loopBeginQuery by """
+    val loopBeginQuery by WholeMatchQuery(
+        """
 digraph G {
         loopBegin [ label="(?P<begin>)|is('LoopBeginNode')" ];
         loopEnd [ label="[](?P<end>)|is('LoopEndNode') or is('LoopExitNode')" ];
@@ -235,8 +232,7 @@ digraph G {
         loopBegin -> loopEnd [ label="is('ASSOCIATED')" ];
 }
     """
-
-    val loopBeginQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+    ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val begin = captureGroups.getValue("begin").first()
         val ends = captureGroups.getValue("end")
 
@@ -248,7 +244,8 @@ digraph G {
         )
     }
 
-    val loopNextQuery by """
+    val loopNextQuery by WholeMatchQuery(
+        """
 digraph G {
     loopEnd [ label="(?P<loopEnd>)|1=1" ];
     merge [ label="(?P<merge>)|1=1" ];
@@ -258,15 +255,15 @@ digraph G {
     loopEnd -> next [ label="is('CONTROL')" ];
 }
     """
-
-    val loopNextQueryAction: WholeMatchAction by { capture: Map<String, List<NodeWrapper>> ->
+    ) { capture: Map<String, List<NodeWrapper>> ->
         val end = capture.getValue("loopEnd").first()
         val next = capture.getValue("next").first()
 
         state[end] = state.getValue(end).copy(nextIds = setOf(next.id))
     }
 
-    val mergePathQuery by """
+    val mergePathQuery by WholeMatchQuery(
+        """
 digraph G {
     mergeBegin [ label="(?P<mergeBegin>)|is('StartNode') or is('AbstractMergeNode') or is('LoopExitNode')" ];
     someNode [ label="(?P<mergePath>)|not is('AbstractMergeNode') and not is ('ReturnNode') and not is('LoopEndNode') and not is ('LoopExitNode')" ];
@@ -276,8 +273,7 @@ digraph G {
     someNode -> mergeEnd [ label="is('CONTROL')" ];
 }
     """
-
-    val mergePathQueryAction: WholeMatchAction by { captureGroupActions: Map<String, List<NodeWrapper>> ->
+    ) { captureGroupActions: Map<String, List<NodeWrapper>> ->
         val begin = captureGroupActions.getValue("mergeBegin").first()
         val end = captureGroupActions.getValue("mergeEnd").first()
         val nodes = listOf(begin) + captureGroupActions.getValue("mergePath")
@@ -312,7 +308,8 @@ ${values.prependIndent("    ")}
         )
     }
 
-    val returnNodeQuery by """
+    val returnNodeQuery by WholeMatchQuery(
+        """
 digraph G {
     r [ label = "(?P<returnNode>)|is('ReturnNode')" ];
     v [ label = "(?P<value>)|" ];
@@ -320,8 +317,7 @@ digraph G {
     v -> r [ label = "is('DATA')" ];
 }
     """
-
-    val returnNodeQueryAction: WholeMatchAction by { captureGroups: Map<String, List<NodeWrapper>> ->
+    ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val returnNode = captureGroups.getValue("returnNode").first()
         val value = captureGroups.getValue("value").first()
 
