@@ -133,10 +133,28 @@ digraph G {
         return nodes to edges
     }
 
+    fun printGraph() {
+        val (nodes, edges) = getPointsToGraph()
+        var i = 1
+        val numberedNodes = nodes.associateWith { i++ }
+        val edgesStrings = edges.map { (from, field, to) ->
+            val fromId = numberedNodes[from]!!
+            val toId = numberedNodes[to]!!
+            "    $fromId -> $toId [ label=\"$field\" ];"
+        }
+        val graphFormat = """
+digraph G {
+${numberedNodes.entries.joinToString("\n") { "    ${it.value} [label=\"${it.key.toString().replace("\"", "'")}\"];" }}
+${edgesStrings.joinToString("\n")}
+}
+            """
+        println(graphFormat)
+    }
+
 }
 
 typealias PointsToGraph = Pair<Set<NodeWrapper>, Set<Triple<NodeWrapper, String, NodeWrapper>>>
-typealias PointsToGraphPreliminiaries = Map<GenericObjectWithField, List<NodeWrapper>> // this definitely needs to be its own class, or maybe removed. TODO
+typealias PointsToGraphPreliminiaries = Map<GenericObjectWithField, List<NodeWrapper>>
 
 class GenericObjectWithField(val obj: NodeWrapper?, val field: String) : NodeWrapper(null) {
     override fun equals(other: Any?): Boolean {

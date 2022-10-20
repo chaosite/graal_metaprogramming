@@ -43,106 +43,105 @@ fun anyHolder2(param: String?): AnyHolder {
     fourth.any = second.other
     fourth.other = third.any
 
+    return fourth
+}
+
+fun anyHolder3(param: String?): AnyHolder {
+    val first = AnyHolder() // 85
+    anyUser(first)
+    first.any = param ?: ""
+    first.other = null
+
+    val second = AnyHolder() // 89
+    anyUser(second)
+    second.any = null
+    second.other = null
+    if (param != null && param.length > 2) {
+        second.any = first
+        second.other = param
+    } // to try next: separate if to two ifs with same condition
+
+    val third = AnyHolder() // 93
+    anyUser(third)
+    third.any = second
+    third.other = null
     return third
 }
 
 
 class PointsToAnalysisTests {
 
-        val methodToGraph = MethodToGraph()
+    val methodToGraph = MethodToGraph()
 
-        @Test
-        fun `print anyHolder graphs`() {
-            val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
-            val adapted = GraalAdapter.fromGraal(cfg)
+    @Test
+    fun `print anyHolder graphs`() {
+        val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
+        val adapted = GraalAdapter.fromGraal(cfg)
 
-            val sw = StringWriter()
-            adapted.exportQuery(sw)
+        val sw = StringWriter()
+        adapted.exportQuery(sw)
 
-            println(sw.buffer)
-        }
-
-        @Test
-        fun `get pointsto graph preliminaries of anyHolder`() {
-            val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
-            val graph = GraalAdapter.fromGraal(cfg)
-            val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiariesForDebug()
-            values.filter { it.first.node is StoreFieldNode }.forEach(::println)
-            println()
-            allocations.forEach(::println)
-            println()
-            associated.forEach(::println)
-        }
-
-        @Test
-        fun `get pointsto graph of anyHolder`() {
-            val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
-            val graph = GraalAdapter.fromGraal(cfg)
-            val (nodes, edges) = PointsToAnalysis(graph).getPointsToGraph()
-            var i = 1
-            val numberedNodes = nodes.associateWith { i++ }
-            val edgesStrings = edges.map { (from, field, to) ->
-                val fromId = numberedNodes[from]!!
-                val toId = numberedNodes[to]!!
-                "    $fromId -> $toId [ label=\"$field\" ];"
-            }
-            val graphFormat = """
-digraph G {
-${numberedNodes.entries.joinToString("\n") { "    ${it.value} [label=\"${it.key.toString().replace("\"", "'")}\"];" }}
-${edgesStrings.joinToString("\n")}
-}
-            """
-            println(graphFormat)
-
-        }
-
-        @Test
-        fun `print anyHolder2 graphs`() {
-            val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
-            val adapted = GraalAdapter.fromGraal(cfg)
-
-            val sw = StringWriter()
-            adapted.exportQuery(sw)
-
-            val rawGraph = sw.buffer.toString().split("\n")
-            val frameStateNodes = rawGraph.filter { it.contains("FrameState") }
-                .map { it.trim().split(" ")[0] }.toSet()
-            println(rawGraph.filter {
-                "FrameState" !in it && frameStateNodes.all { itt -> " $itt -" !in it && "> $itt " !in it }
-            }.joinToString("\n"))
-        }
-
-        @Test
-        fun `get pointsto graph preliminaries of anyHolder2`() {
-            val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
-            val graph = GraalAdapter.fromGraal(cfg)
-            val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiariesForDebug()
-            values.filter { it.first.node is StoreFieldNode }.forEach(::println)
-            println()
-            allocations.forEach(::println)
-            println()
-            associated.forEach(::println)
-        }
-
-        @Test
-        fun `get pointsto graph of anyHolder2`() {
-            val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
-            val graph = GraalAdapter.fromGraal(cfg)
-            val (nodes, edges) = PointsToAnalysis(graph).getPointsToGraph()
-            var i = 1
-            val numberedNodes = nodes.associateWith { i++ }
-            val edgesStrings = edges.map { (from, field, to) ->
-                val fromId = numberedNodes[from]!!
-                val toId = numberedNodes[to]!!
-                "    $fromId -> $toId [ label=\"$field\" ];"
-            }
-            val graphFormat = """
-digraph G {
-${numberedNodes.entries.joinToString("\n") { "    ${it.value} [label=\"${it.key.toString().replace("\"", "'")}\"];" }}
-${edgesStrings.joinToString("\n")}
-}
-            """
-            println(graphFormat)
-
-        }
+        println(sw.buffer)
     }
+
+    @Test
+    fun `get pointsto graph preliminaries of anyHolder`() {
+        val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
+        val graph = GraalAdapter.fromGraal(cfg)
+        val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiariesForDebug()
+        values.filter { it.first.node is StoreFieldNode }.forEach(::println)
+        println()
+        allocations.forEach(::println)
+        println()
+        associated.forEach(::println)
+    }
+
+    @Test
+    fun `get pointsto graph of anyHolder`() {
+        val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
+        val graph = GraalAdapter.fromGraal(cfg)
+        PointsToAnalysis(graph).printGraph()
+    }
+
+    @Test
+    fun `print anyHolder2 graphs`() {
+        val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
+        val adapted = GraalAdapter.fromGraal(cfg)
+
+        val sw = StringWriter()
+        adapted.exportQuery(sw)
+
+        val rawGraph = sw.buffer.toString().split("\n")
+        val frameStateNodes = rawGraph.filter { it.contains("FrameState") }
+            .map { it.trim().split(" ")[0] }.toSet()
+        println(rawGraph.filter {
+            "FrameState" !in it && frameStateNodes.all { itt -> " $itt -" !in it && "> $itt " !in it }
+        }.joinToString("\n"))
+    }
+
+    @Test
+    fun `get pointsto graph preliminaries of anyHolder2`() {
+        val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
+        val graph = GraalAdapter.fromGraal(cfg)
+        val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiariesForDebug()
+        values.filter { it.first.node is StoreFieldNode }.forEach(::println)
+        println()
+        allocations.forEach(::println)
+        println()
+        associated.forEach(::println)
+    }
+
+    @Test
+    fun `get pointsto graph of anyHolder2`() {
+        val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
+        val graph = GraalAdapter.fromGraal(cfg)
+        PointsToAnalysis(graph).printGraph()
+    }
+
+    @Test
+    fun `get pointsto graph of anyHolder3`() {
+        val cfg = methodToGraph.getCFG(::anyHolder3.javaMethod)
+        val graph = GraalAdapter.fromGraal(cfg)
+        PointsToAnalysis(graph).printGraph()
+    }
+}
