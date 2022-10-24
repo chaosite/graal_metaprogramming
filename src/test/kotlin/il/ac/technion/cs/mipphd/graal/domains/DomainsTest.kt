@@ -44,8 +44,12 @@ internal class DomainsTest {
             val results = executor.iterateUntilFixedPoint()
             val items = results.toList().asSequence().sortedBy { it.first.id }.map { it.second }
             for (item in items) {
-                if (item.statements.isNotEmpty())
+                if (item.statements.isNotEmpty()) {
+                    println("# polystate_in: ${item.polyhedralAbstractState_in}")
                     println(item.statements)
+                    println("# polystate: ${item.polyhedralAbstractState}")
+                    println()
+                }
             }
         }
 

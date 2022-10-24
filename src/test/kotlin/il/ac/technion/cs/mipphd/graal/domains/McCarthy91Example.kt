@@ -1,5 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.domains
 
+import arrow.core.Either
 import il.ac.technion.cs.mipphd.graal.graphquery.CaptureGroupQuery
 import il.ac.technion.cs.mipphd.graal.graphquery.QueryExecutor
 import il.ac.technion.cs.mipphd.graal.graphquery.WholeMatchQuery
@@ -23,14 +24,54 @@ fun mccarthy91(l: Long): Long {
     return n
 }
 
+data class Condition(
+    val name: String,
+    val rel: String,
+    val rhs: Either<Number, String>
+) {
+    companion object {
+        private fun parse(rhs: String): Either<Number, String> {
+            val parsed = rhs.toDoubleOrNull()
+            if (parsed != null)
+                return Either.Left(parsed as Number)
+            return Either.Right(rhs)
+        }
+    }
+
+    constructor(name: String, rel: String, rhs: Number) : this(name, rel, Either.Left(rhs))
+    constructor(name: String, rel: String, rhs: String) : this(name, rel, parse(rhs))
+
+    fun negate(): Condition {
+        return Condition(
+            name,
+            when (rel) {
+                "==" -> "!="
+                ">" -> "<="
+                ">=" -> "<"
+                "<" -> ">="
+                "<=" -> "<"
+                "!=" -> "=="
+                else -> throw RuntimeException("Unknown rel '$rel'")
+            },
+            rhs
+        )
+    }
+}
+
 data class Item(
     val expression: String,
+    val symbolicExpression: SymbolicLinExpr = SymbolicLinExpr(listOf(), 0.toMpq()),
     val statements: String = "",
     val condition: String = "",
+    val conditions: List<Condition> = listOf(),
+    val if_conditions: List<Condition> = listOf(),
     val relatedValues: List<NodeWrapper> = listOf(),
     val nextIds: Set<Int> = setOf(),
     val mergeValues: Map<NodeWrapper, Map<NodeWrapper, NodeWrapper>> = mapOf(),
-    val mergeAssignments: Map<NodeWrapper, Map<String, String>> = mapOf()
+    val mergeAssignments: Map<NodeWrapper, Map<String, String>> = mapOf(),
+    val symbolicMergeAssignments: Map<NodeWrapper, Map<String, SymbolicLinExpr>> = mapOf(),
+    val polyhedralAbstractState: PolyhedralAbstractState = PolyhedralAbstractState.bottom(),
+    val polyhedralAbstractState_in: PolyhedralAbstractState = PolyhedralAbstractState.bottom()
 ) {
     companion object {
         fun default(): Item = Item("")
@@ -54,18 +95,45 @@ digraph G {
         val x = captureGroups.getValue("x").first()
         val y = captureGroups.getValue("y").first()
         val xText = state.getValue(x).expression
+        val xSym = state.getValue(x).symbolicExpression
         val yText = state.getValue(y).expression
-        state[node] = Item("$xText ${arithmeticNodeToText(node)} $yText")
+        val ySym = state.getValue(y).symbolicExpression
+        val newSym = when (arithmeticNodeToText(node)) {
+            "+" -> xSym.plus(ySym)
+            "*" -> xSym.times(ySym)
+            "-" -> xSym.plus(ySym.times(SymbolicLinExpr(listOf(), (-1).toMpq())))
+            else -> SymbolicLinExpr(listOf(), 0.toMpq()) // TODO: Probably not important...
+        }
+        state[node] = Item(
+            "$xText ${arithmeticNodeToText(node)} $yText",
+            conditions = listOf(Condition(xText, arithmeticNodeToText(node), yText)),
+            symbolicExpression = newSym
+        )
     }
 
     private fun arithmeticNodeToText(node: NodeWrapper): String = node.node.toString().replace(Regex("^[^|]*\\|"), "")
+
+    val startNodeState by CaptureGroupQuery("""
+        digraph G {
+            n [ label = "(?P<start>)|is('StartNode')" ];
+        }
+    """.trimIndent(), "start" to { nodes ->
+        val start = nodes.first()
+        state.getValue(start).copy(polyhedralAbstractState_in = PolyhedralAbstractState.top().assume("parameter1", "<=", 101))
+    })
 
     val constantQuery by CaptureGroupQuery("""
 digraph G {
     n [ label = "(?P<constant>)|is('ConstantNode')" ];
 }
-""", "constant" to  { nodes: List<NodeWrapper> ->
-        Item(expression = NodeWrapperUtils.getConstantValue(nodes.first()))
+""", "constant" to { nodes: List<NodeWrapper> ->
+        Item(
+            expression = NodeWrapperUtils.getConstantValue(nodes.first()),
+            symbolicExpression = SymbolicLinExpr(
+                listOf(),
+                (NodeWrapperUtils.getConstantValue(nodes.first()).toDoubleOrNull() ?: 0).toMpq()
+            )
+        )
     })
 
     val valuePhiQuery by CaptureGroupQuery("""
@@ -73,7 +141,11 @@ digraph G {
     valuephi [ label = "(?P<valuephi>)|is('ValuePhiNode')" ];
 }
 """, "valuephi" to { nodes: List<NodeWrapper> ->
-        Item(expression = "phi${nodes.first().id}")
+        val name = "phi${nodes.first().id}"
+        Item(
+            expression = name,
+            symbolicExpression = SymbolicLinExpr(listOf(Monom(name, 1.toMpq())), 0.toMpq())
+        )
     })
 
     val valueProxyQuery by WholeMatchQuery(
@@ -89,7 +161,10 @@ digraph G {
         val proxy = captures.getValue("valueProxy").first()
         val value = captures.getValue("value").first()
 
-        state[proxy] = state.getValue(proxy).copy(expression = state.getValue(value).expression)
+        state[proxy] = state.getValue(proxy).copy(
+            expression = state.getValue(value).expression,
+            symbolicExpression = state.getValue(value).symbolicExpression
+        )
     }
 
     val parameterQuery by CaptureGroupQuery("""
@@ -97,7 +172,11 @@ digraph G {
     n [ label = "(?P<parameter>)|is('ParameterNode')" ];
 }
 """, "parameter" to { nodes: List<NodeWrapper> ->
-        Item(expression = "parameter${nodes.first().id}")
+        val name = "parameter${nodes.first().id}"
+        Item(
+            expression = name,
+            symbolicExpression = SymbolicLinExpr(listOf(Monom(name, 1.toMpq())), 0.toMpq())
+        )
     })
 
 
@@ -113,7 +192,7 @@ digraph G {
     ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val node = captureGroups.getValue("ifnode").first()
         val condition = captureGroups.getValue("ifcondition").first()
-        state[node] = Item(state.getValue(condition).expression)
+        state[node] = Item(state.getValue(condition).expression, if_conditions = state.getValue(condition).conditions)
     }
 
     val ifPathQuery by WholeMatchQuery(
@@ -125,16 +204,68 @@ digraph G {
 
     ifnode -> truepath [ label="is('CONTROL') and name() = 'trueSuccessor'" ];
     ifnode -> falsepath [ label="is('CONTROL') and name() = 'falseSuccessor'" ];
-}
-"""
+}"""
     ) { captureGroups: Map<String, List<NodeWrapper>> ->
         val ifNode = captureGroups.getValue("ifpathnode").first()
         val nextTrue = captureGroups.getValue("truepath").first()
         val nextFalse = captureGroups.getValue("falsepath").first()
 
-        state[nextTrue] = state.getValue(nextTrue).copy(condition = state.getValue(ifNode).expression)
-        state[nextFalse] = state.getValue(nextFalse).copy(condition = "!(${state.getValue(ifNode).expression})")
+        state[nextTrue] = state.getValue(nextTrue).copy(
+            condition = state.getValue(ifNode).expression,
+            conditions = state.getValue(ifNode).if_conditions.toList()
+        )
+        state[nextFalse] = state.getValue(nextFalse).copy(
+            condition = "!(${state.getValue(ifNode).expression})",
+            conditions = state.getValue(ifNode).if_conditions.map { it.negate() })
     }
+
+    val propagatePolyhedralAbstractStateQuery by WholeMatchQuery(
+        """
+digraph G {
+    sources [ label="[](?P<sources>)|" ];
+    destination [ label="(?P<destination>)|" ];
+    
+    
+    sources -> destination [ label = "is('CONTROL')" ];
+}
+        """.trimIndent()
+    ) { captureGroups ->
+        val destination = captureGroups.getValue("destination").first()
+        val sources = captureGroups.getValue("sources")
+
+        val polyState = sources.asSequence()
+            .sortedBy { it.id } // for stability
+            .map(state::getValue)
+            .map(Item::polyhedralAbstractState)
+            .reduce { o1, o2 ->
+                val joined = o1.join(o2)
+                // println("${o1.conform(o2)} + ${o2.conform(o1)} = $joined")
+                joined
+            }
+
+        if (sources.size < 0)
+            println("Joining: ${
+                sources.asSequence()
+                    .sortedBy { it.id } // for stability
+                    .map(state::getValue)
+                    .map(Item::polyhedralAbstractState).toList()
+            } => $polyState ($destination)")
+
+        state[destination] = state.getValue(destination).copy(
+            polyhedralAbstractState_in = polyState
+        )
+    }
+
+    val baseTranformQuery by CaptureGroupQuery("""
+digraph G {
+    n [ label = "(?P<node>)|not is('LoopEndNode') and not is('LoopExitNode') and not is ('EndNode')" ];
+}
+""", "node" to { nodes: List<NodeWrapper> ->
+        state.getValue(nodes.first()).copy(
+            polyhedralAbstractState = state.getValue(nodes.first()).polyhedralAbstractState_in
+        )
+    })
+
 
     val frameStateQuery by WholeMatchQuery(
         """
@@ -157,27 +288,26 @@ digraph G {
 
         val map = mutableMapOf<NodeWrapper, MutableMap<NodeWrapper, NodeWrapper>>()
         val assignments = mutableMapOf<NodeWrapper, MutableMap<String, String>>()
+        val symbolicAssignments = mutableMapOf<NodeWrapper, MutableMap<String, SymbolicLinExpr>>()
         for ((n, s) in state.getValue(mergeNode).mergeAssignments) {
             assignments[n] = HashMap(s)
         }
         for (phi in values) {
             for (value in sourceValues) {
-                val edge = graph.getEdge(value, phi) as PhiEdgeWrapper? // TODO: Capture from graph
+                val edge = graph.getEdge(value, phi) as PhiEdgeWrapper? // TODO: Capture from graph?
                 if (edge != null) {
                     assignments.computeIfAbsent(edge.from) { mutableMapOf() }[state.getValue(phi).expression] =
                         state.getValue(value).expression
+                    symbolicAssignments.computeIfAbsent(edge.from) { mutableMapOf() }[state.getValue(phi).expression] =
+                        state.getValue(value).symbolicExpression
                 }
-                /*                val edge = graph.getEdge(value, phi) as PhiEdgeWrapper?
-                                if (edge != null) {
-                                    if (edge.from !in map) {
-                                        map[edge.from] = mutableMapOf()
-                                    }
-                                    map.getValue(edge.from)[phi] = value
-                                } */
             }
         }
         state[mergeNode] =
-            state.getValue(mergeNode).copy(relatedValues = values, mergeValues = map, mergeAssignments = assignments)
+            state.getValue(mergeNode).copy(
+                relatedValues = values, mergeValues = map, mergeAssignments = assignments,
+                symbolicMergeAssignments = symbolicAssignments
+            )
     }
 
     val loopQuery by WholeMatchQuery(
@@ -204,22 +334,35 @@ digraph G {
 
         val condition =
             nodes.asSequence().map(state::getValue).map(Item::condition).filter(String::isNotEmpty).joinToString(" && ")
+        val conditions =
+            nodes.asSequence().map(state::getValue).flatMap(Item::conditions).toList()
 
         val next = if (state.getValue(end).nextIds.isNotEmpty()) state.getValue(end).nextIds.first() else "???"
-        /* val values =
-            state[begin]?.mergeValues?.let { it[end] ?: it[prev] }?.entries?.joinToString("\n") { (phi, valueNode) ->
-                "${state.getValue(phi).expression} := ${state.getValue(valueNode).expression}"
-            } ?: "" */
+
         val values =
             state.getValue(begin).mergeAssignments[end]?.entries?.joinToString(";\n") { (k, v) -> "$k := $v" } ?: ""
-        // Make the text thing
+        val symbolicAssignments = state.getValue(begin).symbolicMergeAssignments[end]?.entries ?: listOf()
+
+        // get polyState
+        val polyStateTemp = conditions.fold(state.getValue(begin).polyhedralAbstractState) { acc, c ->
+            c.rhs.fold({ acc.assume(c.name, c.rel, it) }, { acc })
+        }
+        val polyState = symbolicAssignments.fold(polyStateTemp) { acc, (k, symExpr) ->
+            println("${acc}: ${k} <- ${symExpr}")
+            acc.assign(k, symExpr)
+        }
+
+        // Make the new state (and text thing)
         state[end] = state.getValue(end).copy(
             statements = """
 ${end.id}:
     assume $condition;
 ${values.prependIndent("    ")}
     goto $next
-""".trimIndent()
+    # $polyState, ${state[end]?.polyhedralAbstractState_in} (loopQuery)
+""".trimIndent(),
+            polyhedralAbstractState = polyState,
+            polyhedralAbstractState_in = state.getValue(begin).polyhedralAbstractState
         )
     }
 
@@ -240,6 +383,7 @@ digraph G {
             statements = """
             ${begin.id}:
                 goto ${ends.joinToString(", ") { it.id.toString() }}
+                # (loopBeginQuery)
         """.trimIndent()
         )
     }
@@ -281,20 +425,29 @@ digraph G {
 
         val condition =
             nodes.asSequence().map(state::getValue).map(Item::condition).filter(String::isNotEmpty).joinToString(" && ")
-        /* val values =
-            state.getValue(end).mergeValues[nodes.last()]?.entries?.joinToString("\n") { (phi, valueNode) ->
-                "${state.getValue(phi).expression} := ${state.getValue(valueNode).expression}"
-            } ?: "" */
+        val conditions =
+            nodes.asSequence().map(state::getValue).flatMap(Item::conditions).toList()
 
         val values =
             state.getValue(end).mergeAssignments[lastNode]?.entries?.joinToString(";\n") { (k, v) -> "$k := $v" }
                 ?: "???"
+        val symbolicAssignments = state.getValue(end).symbolicMergeAssignments[lastNode]?.entries ?: listOf()
+
         val nextIds = state.getValue(begin).nextIds + lastNode.id
+
+        // get polyState
+        val polyStateTemp = conditions.fold(state.getValue(begin).polyhedralAbstractState) { acc, c ->
+            c.rhs.fold({ acc.assume(c.name, c.rel, it) }, { acc })
+        }
+        val polyState = symbolicAssignments.fold(polyStateTemp) { acc, (k, symExpr) ->
+            acc.assign(k, symExpr)
+        }
 
         state[begin] = state.getValue(begin).copy(
             nextIds = nextIds, statements = """
             ${begin.id}:
                 ${nextIds.joinToString(", ", "goto ") { it.toString() }}
+                # (mergePathQuery/begin)
         """.trimIndent()
         )
         val assume = if (condition.isNotEmpty()) "assume $condition;" else ""
@@ -304,8 +457,15 @@ ${lastNode.id}:
     $assume
 ${values.prependIndent("    ")}
     goto ${end.id}
-""".trimIndent()
+    # (mergePathQuery/lastNode)
+""".trimIndent(),
+            polyhedralAbstractState = polyState,
+            polyhedralAbstractState_in = state.getValue(begin).polyhedralAbstractState
         )
+
+        if (lastNode.id == 35) {
+            println("35 <- in: ${state[lastNode]?.polyhedralAbstractState_in}, out: ${state[lastNode]?.polyhedralAbstractState}")
+        }
     }
 
     val returnNodeQuery by WholeMatchQuery(
@@ -325,6 +485,7 @@ digraph G {
             statements = """
             ${returnNode.id}:
                 return ${state.getValue(value).expression}
+                # (returnNodeQuery)
         """.trimIndent()
         )
     }

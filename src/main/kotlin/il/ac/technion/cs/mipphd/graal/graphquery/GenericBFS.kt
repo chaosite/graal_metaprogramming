@@ -133,6 +133,11 @@ fun bfsMatch(
 ): List<Map<GraphQueryVertex<*>, List<NodeWrapper>>> {
     if (!GraphTests.isConnected(query))
         throw RuntimeException("Query is not weakly-connected - this is an error.")
+    if (queryStart is GraphQueryVertexM) {
+        val metadata = queryStart.mQuery as Metadata
+        if (metadata.options.contains(MetadataOption.Repeated))
+            throw RuntimeException("Shouldn't start the BFS on a repeated node, pick another")
+    }
     return graph.vertexSet().filter(queryStart::match).flatMap { bfsMatch(query, graph, queryStart, it) }
 }
 
