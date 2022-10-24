@@ -1,6 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.elina
 
-/* import apron.Abstract0
+import apron.Abstract0
 import elina.OptPoly
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
@@ -20,4 +20,4 @@ class BasicTests {
         assertTrue(top.isTop(man) && !top.isBottom(man))
         assertTrue(bottom.isBottom(man) && !bottom.isTop(man))
     }
-} */
+}

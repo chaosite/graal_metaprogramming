@@ -8,6 +8,8 @@ import org.graalvm.compiler.nodes.ValuePhiNode
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import java.io.StringWriter
 import kotlin.reflect.jvm.javaMethod
 
 internal class GenericBFSTest {
@@ -146,6 +148,45 @@ digraph G {
             println()
             assertNotEquals(result[value], result[store])
         }
+    }
+
+    fun hasLoop(i: List<Int>): Int {
+        var n = 5
+        for (e in i) {
+            n += e*3
+        }
+        return n
+    }
+
+    @Test
+    fun `show hasLoop`() {
+        val graph = GraalAdapter.fromGraal(methodToGraph.getCFG(::hasLoop.javaMethod))
+        val sw = StringWriter()
+        graph.exportQuery(sw)
+        println(sw.buffer)
+    }
+
+    @Test
+    fun `finds multiple sources to LoopBegin`() {
+        val graph = GraalAdapter.fromGraal(methodToGraph.getCFG(::hasLoop.javaMethod))
+        val query = GraphQuery.importQuery("""
+            digraph G {
+                sources [ label="[](?P<sources>)|" ];
+                destination [ label="(?P<destination>)|is('LoopBeginNode')" ];
+                
+                
+                sources -> destination [ label = "is('CONTROL')" ];
+            }
+        """.trimIndent())
+
+        val results = bfsMatch(query, graph, query.vertexSet().last())
+        assertEquals(1, results.size)
+        assertEquals(2, results[0].size)
+
+        assertThrows<RuntimeException> {
+            bfsMatch(query, graph, query.vertexSet().first())
+        }
+        println(results)
     }
 
     @Test

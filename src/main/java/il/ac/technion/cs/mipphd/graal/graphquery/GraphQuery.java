@@ -65,11 +65,17 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex<? extends N
 
     private GraphQueryVertex<? extends Node> startCandidate(GraalAdapter cfg) {
         final Set<NodeWrapper> nodes = new HashSet<>(cfg.vertexSet());
-        Optional<GraphQueryVertex<? extends Node>> root = this.vertexSet().stream().filter(v -> this.inDegreeOf(v) == 0).findAny();
+        Optional<GraphQueryVertex<? extends Node>> root = this.vertexSet().stream()
+                .filter(v -> !((Metadata) ((GraphQueryVertexM) v).getMQuery()).getOptions().contains(MetadataOption.Repeated.INSTANCE) )
+                .filter(v -> this.inDegreeOf(v) == 0).findAny();
         if (root.isPresent())
             return root.get();
         // TODO: Improve this, filtering out the ReturnNodes isn't good enough.
-        Map<Long, List<GraphQueryVertex<? extends Node>>> histogram = this.vertexSet().stream().filter(v -> !ReturnNode.class.isAssignableFrom(v.getClazz())).collect(Collectors.groupingBy(v -> nodes.stream().map(NodeWrapper::getNode).filter(v::match).count()));
+        Map<Long, List<GraphQueryVertex<? extends Node>>> histogram = this.vertexSet().stream()
+                .filter(v -> !((Metadata) ((GraphQueryVertexM) v).getMQuery()).getOptions().contains(MetadataOption.Repeated.INSTANCE) )
+                .filter(v -> !ReturnNode.class.isAssignableFrom(v.getClazz()))
+                .collect(Collectors.groupingBy(v -> nodes.stream().map(NodeWrapper::getNode).filter(v::match).count()));
+        System.out.println(histogram);
         return histogram.get(histogram.keySet().stream().min(Comparator.naturalOrder()).get()).get(0);
     }
 

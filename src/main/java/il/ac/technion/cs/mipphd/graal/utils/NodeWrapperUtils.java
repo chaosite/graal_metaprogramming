@@ -9,8 +9,14 @@ public class NodeWrapperUtils {
     public static boolean isInvoke(NodeWrapper wrapper) {
         return wrapper.getNode() instanceof Invoke;
     }
-    public static boolean isConstant(NodeWrapper wrapper) { return wrapper.getNode() instanceof ConstantNode; }
-    public static boolean isLogic(NodeWrapper wrapper) { return wrapper.getNode() instanceof LogicNode; }
+
+    public static boolean isConstant(NodeWrapper wrapper) {
+        return wrapper.getNode() instanceof ConstantNode;
+    }
+
+    public static boolean isLogic(NodeWrapper wrapper) {
+        return wrapper.getNode() instanceof LogicNode;
+    }
 
     @NotNull
     public static MethodWrapper getTargetMethod(@NotNull NodeWrapper wrapper) {
