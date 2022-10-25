@@ -40,7 +40,7 @@ dependencies {
     implementation("org.jgrapht:jgrapht-io:$jgraphtVersion")
 
     // spotbugs annotations (for @NonNull in Java)
-    implementation("com.github.spotbugs:spotbugs-annotations:4.7.2")
+    implementation("com.github.spotbugs:spotbugs-annotations:4.7.3")
 
     // better-parse parser library
     implementation("com.github.h0tk3y.betterParse:better-parse:0.4.4")
@@ -59,7 +59,7 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.23.1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
-    testImplementation("org.amshove.kluent:kluent:1.68")
+    testImplementation("org.amshove.kluent:kluent:1.70")
     testImplementation("io.mockk:mockk:1.13.2")
 }
 
