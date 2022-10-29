@@ -7,18 +7,33 @@ import org.graalvm.compiler.nodes.java.LoadFieldNode
 import org.graalvm.compiler.nodes.java.StoreFieldNode
 import org.junit.jupiter.api.Test
 import java.io.StringWriter
+import kotlin.properties.Delegates
 import kotlin.reflect.jvm.javaMethod
 
 external fun anyUser(any: Any?): Boolean
 data class AnyHolder(var any: Any? = null, var other: Any? = null)
 
-fun anyHolder(param: String?): AnyHolder {
+fun anyHolder(param: String?): AnyHolder { // TODO constructors don't work as expected
     val first = AnyHolder(param ?: "")
     anyUser(first)
     val second = AnyHolder(first, param ?: "") // AnyHolder(if(anyUser(param)) first else param)
     anyUser(second)
     val third = AnyHolder(second)
     anyUser(third)
+    return third
+}
+
+fun anyHolderVariant(param: String?): AnyHolder {
+    val first = AnyHolder()
+    anyUser(first)
+    first.any = param ?: ""
+    val second = AnyHolder()
+    anyUser(second)
+    second.any = first
+    second.other = param ?: ""
+    val third = AnyHolder()
+    anyUser(third)
+    third.any = second
     return third
 }
 
@@ -54,12 +69,12 @@ fun anyHolder3(param: String?): AnyHolder {
 
     val second = AnyHolder() // 89
     anyUser(second)
-    second.any = null
-    second.other = null
-    if (param != null && param.length > 2) {
-        second.any = first
-        second.other = param
-    } // to try next: separate if to two ifs with same condition
+//    second.any = null
+//    second.other = null
+//    if (param != null && param.length > 2) {
+    second.any = first
+    second.other = param
+//    } // to try next: separate if to two ifs with same condition
 
     val third = AnyHolder() // 93
     anyUser(third)
@@ -68,80 +83,137 @@ fun anyHolder3(param: String?): AnyHolder {
     return third
 }
 
+class BinTree<T>(var value: T? = null, var left: BinTree<T>? = null, var right: BinTree<T>? = null)
+
+fun <T> containsValue(value: Int, root: BinTree<T>?): Boolean {
+    if (root == null) return false;
+    if (root.value == value) return true
+    return containsValue(value, root.left) || containsValue(value, root.right)
+}
+
+fun addToBst(value: Int, root: BinTree<Int>) {
+    if (containsValue(value, root)) return
+    if (root.value!! < value) {
+        if (root.right == null) {
+            val newTree = BinTree<Int>()
+            newTree.value = value
+            root.right = newTree
+        } else addToBst(value, root.right!!)
+    } else {
+        if (root.left == null) {
+            val newTree = BinTree<Int>()
+            newTree.value = value
+            root.left = newTree
+        } else addToBst(value, root.left!!)
+    }
+}
+
+class IntWrapper { var value by Delegates.notNull<Int>() }
+
+fun addRangeToBinTree(start: Int, end: Int): BinTree<Int> {
+    var root = BinTree<Int>()
+    anyUser(root)
+    root.value = start
+    for (i in start..end) {
+        if (anyUser(i)) {
+            val newNode = BinTree<Int>()
+            anyUser(newNode)
+            newNode.value = i
+            root.right = newNode
+            root = newNode
+        } else {
+            val newNode = BinTree<Int>()
+            anyUser(newNode)
+            newNode.value = i
+            root.left = newNode
+            root = newNode
+        }
+    }
+    return root
+}
 
 class PointsToAnalysisTests {
 
-    val methodToGraph = MethodToGraph()
-
-    @Test
-    fun `print anyHolder graphs`() {
-        val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
-        val adapted = GraalAdapter.fromGraal(cfg)
-
-        val sw = StringWriter()
-        adapted.exportQuery(sw)
-
-        println(sw.buffer)
-    }
-
-    @Test
-    fun `get pointsto graph preliminaries of anyHolder`() {
-        val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
-        val graph = GraalAdapter.fromGraal(cfg)
-        val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiariesForDebug()
-        values.filter { it.first.node is StoreFieldNode }.forEach(::println)
-        println()
-        allocations.forEach(::println)
-        println()
-        associated.forEach(::println)
-    }
-
+//        @Test
+//    fun `get graal graphs for anyHolder`() {
+//        val methodToGraph = MethodToGraph()
+//        val graph = methodToGraph.getCFG(::anyHolder.javaMethod)
+//        val adapter = GraalAdapter.fromGraal(graph)
+//        val writer = StringWriter()
+//        adapter.exportQuery(writer)
+//        println(writer.toString())
+//        println()
+//    }
+//
     @Test
     fun `get pointsto graph of anyHolder`() {
-        val cfg = methodToGraph.getCFG(::anyHolder.javaMethod)
-        val graph = GraalAdapter.fromGraal(cfg)
-        PointsToAnalysis(graph).printGraph()
+        println("anyHolder")
+        val analysis = PointsToAnalysis(::anyHolder.javaMethod)
+        analysis.printGraph()
+        println()
+        val graph = analysis.pointsToGraph
+        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 3)
     }
 
     @Test
-    fun `print anyHolder2 graphs`() {
-        val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
-        val adapted = GraalAdapter.fromGraal(cfg)
-
-        val sw = StringWriter()
-        adapted.exportQuery(sw)
-
-        val rawGraph = sw.buffer.toString().split("\n")
-        val frameStateNodes = rawGraph.filter { it.contains("FrameState") }
-            .map { it.trim().split(" ")[0] }.toSet()
-        println(rawGraph.filter {
-            "FrameState" !in it && frameStateNodes.all { itt -> " $itt -" !in it && "> $itt " !in it }
-        }.joinToString("\n"))
-    }
-
-    @Test
-    fun `get pointsto graph preliminaries of anyHolder2`() {
-        val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
-        val graph = GraalAdapter.fromGraal(cfg)
-        val (values, allocations, associated) = PointsToAnalysis(graph).getPointsToGraphPreliminiariesForDebug()
-        values.filter { it.first.node is StoreFieldNode }.forEach(::println)
+    fun `get pointsto graph of anyHolderVariant`() {
+        println("anyHolderVariant")
+        val analysis = PointsToAnalysis(::anyHolderVariant.javaMethod)
+        analysis.printGraph()
         println()
-        allocations.forEach(::println)
-        println()
-        associated.forEach(::println)
+        val graph = analysis.pointsToGraph
+        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 3)
     }
 
     @Test
     fun `get pointsto graph of anyHolder2`() {
-        val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
-        val graph = GraalAdapter.fromGraal(cfg)
-        PointsToAnalysis(graph).printGraph()
+        println("anyHolder2")
+        val analysis = PointsToAnalysis(::anyHolder2.javaMethod)
+        analysis.printGraph()
+        println()
+        val graph = analysis.pointsToGraph
+        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 4)
     }
 
     @Test
     fun `get pointsto graph of anyHolder3`() {
-        val cfg = methodToGraph.getCFG(::anyHolder3.javaMethod)
-        val graph = GraalAdapter.fromGraal(cfg)
-        PointsToAnalysis(graph).printGraph()
+        println("anyHolder3")
+        val analysis = PointsToAnalysis(::anyHolder3.javaMethod)
+        analysis.printGraph()
+        println()
+        val graph = analysis.pointsToGraph
+        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 3)
+    }
+
+
+    @Test
+    fun `get pointsto graph of addToBst`() {
+        println("addToBst")
+        val analysis = PointsToAnalysis(::addToBst.javaMethod)
+        analysis.printGraph()
+        println()
+        val graph = analysis.pointsToGraph
+        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 2)
+    }
+
+//    @Test
+//    fun `get pointsto graph of addRangeToBinTree`() {
+//        println("addRangeToBinTree")
+//        val analysis = PointsToAnalysis(::addRangeToBinTree.javaMethod)
+//        analysis.printGraph()
+//        println()
+//        val graph = analysis.pointsToGraph
+//        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 2)
+//    }
+
+    @Test
+    fun `get graal graphs for addRangeToBinTree`() {
+        val methodToGraph = MethodToGraph()
+        val graph = methodToGraph.getCFG(::addRangeToBinTree.javaMethod)
+        val adapter = GraalAdapter.fromGraal(graph)
+        val writer = StringWriter()
+        adapter.exportQuery(writer)
+        println(writer.toString())
+        println()
     }
 }

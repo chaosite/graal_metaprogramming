@@ -1,15 +1,24 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
+import il.ac.technion.cs.mipphd.graal.SourcePosTool
+import il.ac.technion.cs.mipphd.graal.utils.EdgeWrapper
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
+import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import org.graalvm.compiler.nodes.ValueNode
 import org.graalvm.compiler.nodes.java.LoadFieldNode
 import org.graalvm.compiler.nodes.java.StoreFieldNode
-import org.jgrapht.alg.drawing.model.Points
+import org.jgrapht.nio.Attribute
+import org.jgrapht.nio.DefaultAttribute
+import org.jgrapht.nio.dot.DOTExporter
+import java.io.StringWriter
+import java.lang.reflect.Method
 
 class PointsToResult(var correspondingAllocatedObject: NodeWrapper? = null, val storedValues: MutableSet<NodeWrapper> = mutableSetOf())
-class PointsToAnalysis(graph: GraalAdapter) : QueryExecutor<PointsToResult>(graph, { PointsToResult() }) {
+class PointsToAnalysis(val method: Method?)
+    : QueryExecutor<PointsToResult>(GraalAdapter.fromGraal(methodToGraph.getCFG(method!!)), { PointsToResult() }) {
     companion object {
+        private val methodToGraph = MethodToGraph()
         val NOP_NODES = listOf(
             "Pi",
             "VirtualInstance",
@@ -33,6 +42,43 @@ class PointsToAnalysis(graph: GraalAdapter) : QueryExecutor<PointsToResult>(grap
         private val getFieldMethod = accessFieldNodeClass.getDeclaredMethod("field")
         private val fieldClazz = Class.forName("jdk.vm.ci.meta.JavaField")
         private val getFieldNameMethod = fieldClazz.getDeclaredMethod("getName")
+
+
+        // todo - code duplication w/ GraalAdapter
+        private val edgeColor = mapOf(
+            EdgeWrapper.DATA to "blue",
+            EdgeWrapper.CONTROL to "red",
+            EdgeWrapper.ASSOCIATED to "black"
+        )
+        private val edgeStyle = mapOf(
+            EdgeWrapper.DATA to "",
+            EdgeWrapper.CONTROL to "",
+            EdgeWrapper.ASSOCIATED to "dashed"
+        )
+        private fun writeQueryInternal(graalph: GraalAdapter, output: StringWriter) {
+            val exporter = DOTExporter<NodeWrapper, EdgeWrapper> { v: NodeWrapper ->
+                val node = v.node
+                val suffix = if (node is ValueNode) " (${SourcePosTool.getStackTraceElement(node)})" else "" // todo throws exception?
+                v.node.id.toString() + suffix
+            }
+
+            exporter.setVertexAttributeProvider { v: NodeWrapper ->
+                val attrs: MutableMap<String, Attribute> =
+                    HashMap()
+                attrs["label"] = DefaultAttribute.createAttribute(v.node.toString())
+                attrs
+            }
+
+            exporter.setEdgeAttributeProvider { e: EdgeWrapper ->
+                val attrs: MutableMap<String, Attribute> =
+                    HashMap()
+                attrs["label"] = DefaultAttribute.createAttribute(e.name)
+                attrs["color"] = DefaultAttribute.createAttribute(edgeColor[e.label])
+                attrs["style"] = DefaultAttribute.createAttribute(edgeStyle[e.label])
+                attrs
+            }
+            exporter.exportGraph(graalph, output)
+        }
     }
     val storeQuery by WholeMatchQuery("""
 digraph G {
@@ -88,7 +134,8 @@ digraph G {
         return Triple(results.map { it.first to it.second.storedValues }, results.map { it.first to it.second.correspondingAllocatedObject }, associated)
     }
 
-    fun getPointsToGraphPreliminiaries() : PointsToGraphPreliminiaries {
+
+    val pointsToGraph : GraalAdapter by lazy {
         val results = iterateUntilFixedPoint().toList().sortedBy { it.first.id }
 
         val associated = results.filter { it.first.node is StoreFieldNode }.associate { itt ->
@@ -106,14 +153,10 @@ digraph G {
             }
             key to value
         }
-        return associated
-    }
-
-    fun getPointsToGraph() : PointsToGraph {
-        val associated = getPointsToGraphPreliminiaries()
-        val nodes = associated.flatMap { it.value }.toSet().union(associated.keys.map { it.obj!! }).filter { it !is GenericObjectWithField }.toSet()
+        val nodes = associated.flatMap { it.value }.toSet().union(associated.keys.mapNotNull { it.obj })
+            .filter { it !is GenericObjectWithField }.toSet()
         val edges = mutableSetOf<Triple<NodeWrapper, String, NodeWrapper>>()
-        associated.forEach { item ->
+        associated.filter { it.key.obj != null }.forEach { item ->
             edges.addAll(item.value.map { Triple(item.key.obj!!, item.key.field, it) })
         }
         while(true) {
@@ -130,30 +173,21 @@ digraph G {
             edges.removeAll(toRemove)
             edges.addAll(toAdd)
         }
-        return nodes to edges
+        val graph = GraalAdapter()
+        nodes.forEach(graph::addVertex)
+        edges.forEach { graph.addEdge(it.first, it.third, EdgeWrapper(EdgeWrapper.ASSOCIATED, it.second)) }
+        graph
     }
 
     fun printGraph() {
-        val (nodes, edges) = getPointsToGraph()
-        var i = 1
-        val numberedNodes = nodes.associateWith { i++ }
-        val edgesStrings = edges.map { (from, field, to) ->
-            val fromId = numberedNodes[from]!!
-            val toId = numberedNodes[to]!!
-            "    $fromId -> $toId [ label=\"$field\" ];"
-        }
-        val graphFormat = """
-digraph G {
-${numberedNodes.entries.joinToString("\n") { "    ${it.value} [label=\"${it.key.toString().replace("\"", "'")}\"];" }}
-${edgesStrings.joinToString("\n")}
-}
-            """
-        println(graphFormat)
+        val sw = StringWriter()
+//        pointsToGraph.exportQuery(sw)
+        writeQueryInternal(pointsToGraph, sw)
+        println(sw.buffer)
     }
 
 }
 
-typealias PointsToGraph = Pair<Set<NodeWrapper>, Set<Triple<NodeWrapper, String, NodeWrapper>>>
 typealias PointsToGraphPreliminiaries = Map<GenericObjectWithField, List<NodeWrapper>>
 
 class GenericObjectWithField(val obj: NodeWrapper?, val field: String) : NodeWrapper(null) {
