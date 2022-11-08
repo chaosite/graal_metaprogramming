@@ -2,9 +2,6 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
-import org.graalvm.compiler.nodes.java.LoadFieldNode
-import org.graalvm.compiler.nodes.java.StoreFieldNode
 import org.junit.jupiter.api.Test
 import java.io.StringWriter
 import kotlin.properties.Delegates
@@ -132,10 +129,61 @@ fun addRangeToBinTree(start: Int, end: Int): BinTree<Int> {
     return root
 }
 
+fun binTreeSimple(): BinTree<Nothing?> {
+    val binTree = BinTree<Nothing?>()
+    anyUser(binTree)
+    binTree.value = null
+    val binTree2 = BinTree<Nothing?>()
+    anyUser(binTree2)
+    binTree2.value = null
+    binTree.left = binTree2
+    val binTree3 = BinTree<Nothing?>()
+    anyUser(binTree3)
+    binTree3.value = null
+    binTree.right = binTree3
+    val binTree4 = BinTree<Nothing?>()
+    anyUser(binTree4)
+    binTree4.value = null
+    binTree3.left = binTree4
+
+    return binTree
+
+}
+
+fun binTreeCycleWithLoopUnrolling(): BinTree<Nothing?> {
+    var root = BinTree<Nothing?>()
+    anyUser(root)
+    root.value = null
+    for(i in 0..10) {
+        val newNode = BinTree<Nothing?>()
+        anyUser(newNode)
+        newNode.value = null
+        root.left = newNode
+        root = newNode
+    }
+    return root
+}
+
+fun binTreeCycle(n: Int): BinTree<Nothing?> {
+    var root = BinTree<Nothing?>()
+    anyUser(root)
+    val origRoot = root
+    root.value = null
+    for(i in 0..n) {
+        val newNode = BinTree<Nothing?>()
+        anyUser(newNode)
+        newNode.value = null
+        root.left = newNode
+        root = newNode
+    }
+    return origRoot
+}
+
 class PointsToAnalysisTests {
 
-//        @Test
+//    @Test
 //    fun `get graal graphs for anyHolder`() {
+//        println("anyHolder graal graphs")
 //        val methodToGraph = MethodToGraph()
 //        val graph = methodToGraph.getCFG(::anyHolder.javaMethod)
 //        val adapter = GraalAdapter.fromGraal(graph)
@@ -207,13 +255,56 @@ class PointsToAnalysisTests {
 //    }
 
     @Test
+    fun `get pointsto graph of binTreeSimple`() {
+        println("binTreeSimple")
+        val analysis = PointsToAnalysis(::binTreeSimple.javaMethod)
+        analysis.printGraph()
+        println()
+        val graph = analysis.pointsToGraph
+        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 4)
+    }
+
+    @Test
+    fun `get pointsto graph of binTreeCycleWithLoopUnrolling`() {
+        println("binTreeCycleWithLoopUnrolling")
+        val analysis = PointsToAnalysis(::binTreeCycleWithLoopUnrolling.javaMethod)
+        analysis.printGraph()
+        println()
+        val graph = analysis.pointsToGraph
+        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 12)
+    }
+
+//    @Test
+//    fun `get graal graphs for binTreeCycle`() {
+//        println("binTreeCycle graal graphs")
+//        val methodToGraph = MethodToGraph()
+//        val graph = methodToGraph.getCFG(::binTreeCycle.javaMethod)
+//        val adapter = GraalAdapter.fromGraal(graph)
+//        val writer = StringWriter()
+//        adapter.exportQuery(writer)
+//        println(writer.toString())
+//        println()
+//    }
+
+    @Test
+    fun `get pointsto graph of binTreeCycle`() {
+        println("binTreeCycle")
+        val analysis = PointsToAnalysis(::binTreeCycle.javaMethod)
+        analysis.printGraph()
+        println()
+        val graph = analysis.pointsToGraph
+        assert(3 == graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size)
+    }
+
+    @Test
     fun `get graal graphs for addRangeToBinTree`() {
         val methodToGraph = MethodToGraph()
-        val graph = methodToGraph.getCFG(::addRangeToBinTree.javaMethod)
+        val graph = methodToGraph.getCFG(::binTreeCycle.javaMethod)
         val adapter = GraalAdapter.fromGraal(graph)
         val writer = StringWriter()
         adapter.exportQuery(writer)
         println(writer.toString())
         println()
     }
+
 }

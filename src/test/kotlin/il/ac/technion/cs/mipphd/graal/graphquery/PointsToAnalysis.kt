@@ -58,7 +58,7 @@ class PointsToAnalysis(val method: Method?)
         private fun writeQueryInternal(graalph: GraalAdapter, output: StringWriter) {
             val exporter = DOTExporter<NodeWrapper, EdgeWrapper> { v: NodeWrapper ->
                 val node = v.node
-                val suffix = if (node is ValueNode) " (${SourcePosTool.getStackTraceElement(node)})" else "" // todo throws exception?
+                val suffix ="" // if (node is ValueNode) " (${SourcePosTool.getStackTraceElement(node)})" else "" // todo throws exception?
                 v.node.id.toString() + suffix
             }
 
@@ -97,9 +97,11 @@ digraph G {
     val assocQuery by WholeMatchQuery("""
 digraph G {
     storeNode [ label="(?P<store>)|is('StoreFieldNode') or is('LoadFieldNode')" ];
+    nop [ label="(?P<nop>)|${NOP_NODES.joinToString(" or ") { "is('$it')" }}" ];
 	allocated [ label="(?P<value>)|is('AllocatedObjectNode')" ];
 
-	allocated -> storeNode [ label="name() = 'object'" ];
+	allocated -> nop [ label="*|is('DATA')" ];
+    nop -> storeNode [ label="name() = 'object'" ];
 }
 """) { captureGroups: Map<String, List<NodeWrapper>> ->
         if(state[captureGroups["store"]!!.first()]?.correspondingAllocatedObject == null) {
