@@ -1,5 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
+import il.ac.technion.cs.mipphd.graal.graphquery.pointsto.PointsToAnalysis
 import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import org.junit.jupiter.api.Test
@@ -195,17 +196,17 @@ class PointsToAnalysisTests {
 //
     @Test
     fun `get pointsto graph of anyHolder`() {
-        println("anyHolder")
+        println("# anyHolder")
         val analysis = PointsToAnalysis(::anyHolder.javaMethod)
         analysis.printGraph()
         println()
         val graph = analysis.pointsToGraph
-        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 3)
+//        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 3)
     }
 
     @Test
     fun `get pointsto graph of anyHolderVariant`() {
-        println("anyHolderVariant")
+        println("# anyHolderVariant")
         val analysis = PointsToAnalysis(::anyHolderVariant.javaMethod)
         analysis.printGraph()
         println()
@@ -215,7 +216,7 @@ class PointsToAnalysisTests {
 
     @Test
     fun `get pointsto graph of anyHolder2`() {
-        println("anyHolder2")
+        println("# anyHolder2")
         val analysis = PointsToAnalysis(::anyHolder2.javaMethod)
         analysis.printGraph()
         println()
@@ -225,7 +226,7 @@ class PointsToAnalysisTests {
 
     @Test
     fun `get pointsto graph of anyHolder3`() {
-        println("anyHolder3")
+        println("# anyHolder3")
         val analysis = PointsToAnalysis(::anyHolder3.javaMethod)
         analysis.printGraph()
         println()
@@ -236,7 +237,7 @@ class PointsToAnalysisTests {
 
     @Test
     fun `get pointsto graph of addToBst`() {
-        println("addToBst")
+        println("# addToBst")
         val analysis = PointsToAnalysis(::addToBst.javaMethod)
         analysis.printGraph()
         println()
@@ -256,7 +257,7 @@ class PointsToAnalysisTests {
 
     @Test
     fun `get pointsto graph of binTreeSimple`() {
-        println("binTreeSimple")
+        println("# binTreeSimple")
         val analysis = PointsToAnalysis(::binTreeSimple.javaMethod)
         analysis.printGraph()
         println()
@@ -266,7 +267,7 @@ class PointsToAnalysisTests {
 
     @Test
     fun `get pointsto graph of binTreeCycleWithLoopUnrolling`() {
-        println("binTreeCycleWithLoopUnrolling")
+        println("# binTreeCycleWithLoopUnrolling")
         val analysis = PointsToAnalysis(::binTreeCycleWithLoopUnrolling.javaMethod)
         analysis.printGraph()
         println()
@@ -274,21 +275,21 @@ class PointsToAnalysisTests {
         assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 12)
     }
 
-//    @Test
-//    fun `get graal graphs for binTreeCycle`() {
-//        println("binTreeCycle graal graphs")
-//        val methodToGraph = MethodToGraph()
-//        val graph = methodToGraph.getCFG(::binTreeCycle.javaMethod)
-//        val adapter = GraalAdapter.fromGraal(graph)
-//        val writer = StringWriter()
-//        adapter.exportQuery(writer)
-//        println(writer.toString())
-//        println()
-//    }
+    @Test
+    fun `get graal graphs for binTreeCycle`() {
+        println("# binTreeCycle graal graphs")
+        val methodToGraph = MethodToGraph()
+        val graph = methodToGraph.getCFG(::binTreeCycle.javaMethod)
+        val adapter = GraalAdapter.fromGraal(graph)
+        val writer = StringWriter()
+        adapter.exportQuery(writer)
+        println(writer.toString())
+        println()
+    }
 
     @Test
     fun `get pointsto graph of binTreeCycle`() {
-        println("binTreeCycle")
+        println("# binTreeCycle")
         val analysis = PointsToAnalysis(::binTreeCycle.javaMethod)
         analysis.printGraph()
         println()

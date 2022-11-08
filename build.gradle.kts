@@ -12,7 +12,7 @@ allprojects {
     }
 }
 
-val graalVersion = "22.2.0"
+val graalVersion = "22.3.0"
 val jgraphtVersion = "1.5.1"
 val junitVersion = "5.9.0"
 
@@ -55,6 +55,8 @@ dependencies {
     if (File(elinaLocation).isDirectory) {
         implementation(files("$elinaLocation/java_interface/elina.jar"))
     }
+
+    implementation(files("elina.jar"))
 
     testImplementation("org.assertj:assertj-core:3.23.1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
