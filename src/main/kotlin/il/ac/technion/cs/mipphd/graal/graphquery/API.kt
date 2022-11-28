@@ -1,11 +1,11 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
 import com.beust.klaxon.json
-import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
+import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph
+import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl
 import java.io.StringWriter
 
-fun compileAndQuery(g: GraalAdapter, q: String): String {
+fun compileAndQuery(g: GraalIRGraph, q: String): String {
 
     val sw = StringWriter()
     g.exportQuery(sw)
@@ -18,7 +18,7 @@ fun compileAndQuery(g: GraalAdapter, q: String): String {
         .stream()
         .map {
             it.entries
-                .map { (qV, gVs) -> Pair(qV.name, gVs.map(NodeWrapper::getId)) }
+                .map { (qV, gVs) -> Pair(qV.name, gVs.map(AnalysisNode::toString)) }
         }
     return json { obj(
         "graph" to mGraph,

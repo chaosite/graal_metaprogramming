@@ -1,6 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
-import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
+import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph
 import il.ac.technion.cs.mipphd.graal.Listable
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import org.graalvm.compiler.nodes.PhiNode
@@ -17,94 +17,18 @@ internal class GenericBFSTest {
     private val maximum = Listable::maximum.javaMethod
 
     @Test
-    fun `maximum query matches maximum function ir`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        val query = GraphMaker.createMaxGraph()
-        val vertex = query.vertexSet().first()
+    fun `maximum query on maximum function ir`() {
+        val graph = methodToGraph.getAnalysisGraph(maximum)
 
-        val results = bfsMatch(query, GraalAdapter.fromGraal(cfg), vertex)
+        val vertex = graph.vertexSet().find { it is AnalysisNode.IR && it.isType("StartNode") }
 
-        assertEquals(18, results.size)
+        println(graph.export())
     }
 
-    @Test
-    fun `minimal query matches maximum function ir`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        val query = GraphMaker.createMinimalQuery()
-        val vertex = query.vertexSet().first()
-
-        val results = bfsMatch(query, GraalAdapter.fromGraal(cfg), vertex)
-
-        assertEquals(2, results.size)
-    }
-
-    @Test
-    fun `minimal kleene query matches maximum function ir`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        val query = GraphMaker.createMinimalKleeneQuery()
-        val vertex = query.vertexSet().first()
-
-        val results = bfsMatch(query, GraalAdapter.fromGraal(cfg), vertex)
-
-        assertEquals(22, results.size)
-    }
-
-    @Test
-    fun `two vertex one edge query matches maximum function ir`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        val query = GraphMaker.createTwoVertexOneEdgeQuery()
-        val vertex = query.vertexSet().last()
-
-        val results = bfsMatch(query, GraalAdapter.fromGraal(cfg), vertex)
-
-        assertEquals(2, results.size)
-    }
-
-    @Test
-    fun `kleene query with return matches maximum function ir`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        val query = GraphMaker.createSimpleKleeneQueryWithReturn()
-        val vertex = query.vertexSet().first()
-        val graph = GraalAdapter.fromGraal(cfg)
-
-        val results = bfsMatch(query, graph, vertex)
-
-        println(results)
-
-        assertEquals(1, results.size)
-    }
-
-
-    @Test
-    fun `possibleChildrenMatches returns something in non-Kleene case`() {
-    }
-
-    @Test
-    fun `possibleChildrenMatches returns something in Kleene case`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        val query = GraphMaker.createMaxGraph()
-        val queryReturnPhi = query.edgeSet().stream()
-            .filter{ it.matchType == GraphQueryEdgeMatchType.KLEENE }
-            .map(query::getEdgeSource)
-            .toList()
-            .first { it.clazz == PhiNode::class.java }
-        val queryReturnKleene = query.getEdgeTarget(query.outgoingEdgesOf(queryReturnPhi).last())
-        val adaptedCfg = GraalAdapter.fromGraal(cfg)
-        val graphReturnPhi = adaptedCfg.vertexSet().stream()
-            .filter { it.node.javaClass == ValuePhiNode::class.java }
-            .toList()
-            .last()
-        val result = possibleChildrenMatches(query, adaptedCfg, queryReturnPhi, graphReturnPhi)
-
-        assertTrue(queryReturnPhi.match(graphReturnPhi)) // sanity
-        println(result)
-        assertEquals(2, result.maxOf { it[queryReturnKleene]!!.size })
-    }
 
     @Test
     fun `bfsMatch doesn't return extra node in match`() {
-        val cfg = methodToGraph.getCFG(::anyHolder2.javaMethod)
-        val graph = GraalAdapter.fromGraal(cfg)
+        val graph = methodToGraph.getAnalysisGraph(::anyHolder2.javaMethod)
 
         val nopNodes = listOf(
             "Pi",
@@ -150,7 +74,7 @@ digraph G {
         }
     }
 
-    fun hasLoop(i: List<Int>): Int {
+    private fun hasLoop(i: List<Int>): Int {
         var n = 5
         for (e in i) {
             n += e*3
@@ -160,7 +84,7 @@ digraph G {
 
     @Test
     fun `show hasLoop`() {
-        val graph = GraalAdapter.fromGraal(methodToGraph.getCFG(::hasLoop.javaMethod))
+        val graph = GraalIRGraph.fromGraal(methodToGraph.getCFG(::hasLoop.javaMethod))
         val sw = StringWriter()
         graph.exportQuery(sw)
         println(sw.buffer)
@@ -168,7 +92,7 @@ digraph G {
 
     @Test
     fun `finds multiple sources to LoopBegin`() {
-        val graph = GraalAdapter.fromGraal(methodToGraph.getCFG(::hasLoop.javaMethod))
+        val graph = methodToGraph.getAnalysisGraph(::hasLoop.javaMethod)
         val query = GraphQuery.importQuery("""
             digraph G {
                 sources [ label="[](?P<sources>)|" ];
@@ -187,15 +111,5 @@ digraph G {
             bfsMatch(query, graph, query.vertexSet().first())
         }
         println(results)
-    }
-
-    @Test
-    @Disabled
-    fun permutations() {
-    }
-
-    @Test
-    @Disabled
-    fun cartesianProduct() {
     }
 }

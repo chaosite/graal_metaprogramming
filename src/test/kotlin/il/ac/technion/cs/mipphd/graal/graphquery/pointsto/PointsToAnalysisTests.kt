@@ -1,7 +1,7 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.graphquery.pointsto.PointsToAnalysis
-import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
+import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import org.junit.jupiter.api.Test
 import java.io.StringWriter
@@ -211,7 +211,7 @@ class PointsToAnalysisTests {
         analysis.printGraph()
         println()
         val graph = analysis.pointsToGraph
-        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 3)
+        assert(graph.vertexSet().filterIsInstance<AnalysisNode.IR>().filter { it.isType("AllocatedObjectNode") }.size == 3)
     }
 
     @Test
@@ -221,7 +221,7 @@ class PointsToAnalysisTests {
         analysis.printGraph()
         println()
         val graph = analysis.pointsToGraph
-        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 4)
+        assert(graph.vertexSet().filterIsInstance<AnalysisNode.IR>().filter { it.isType("AllocatedObjectNode") }.size == 4)
     }
 
     @Test
@@ -231,7 +231,7 @@ class PointsToAnalysisTests {
         analysis.printGraph()
         println()
         val graph = analysis.pointsToGraph
-        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 3)
+        assert(graph.vertexSet().filterIsInstance<AnalysisNode.IR>().filter { it.isType("AllocatedObjectNode") }.size == 3)
     }
 
 
@@ -242,7 +242,7 @@ class PointsToAnalysisTests {
         analysis.printGraph()
         println()
         val graph = analysis.pointsToGraph
-        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 2)
+        assert(graph.vertexSet().filterIsInstance<AnalysisNode.IR>().filter { it.isType("AllocatedObjectNode") }.size == 2)
     }
 
 //    @Test
@@ -262,7 +262,7 @@ class PointsToAnalysisTests {
         analysis.printGraph()
         println()
         val graph = analysis.pointsToGraph
-        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 4)
+        assert(graph.vertexSet().filterIsInstance<AnalysisNode.IR>().filter { it.isType("AllocatedObjectNode") }.size == 4)
     }
 
     @Test
@@ -272,7 +272,7 @@ class PointsToAnalysisTests {
         analysis.printGraph()
         println()
         val graph = analysis.pointsToGraph
-        assert(graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size == 12)
+        assert(graph.vertexSet().filterIsInstance<AnalysisNode.IR>().filter { it.isType("AllocatedObjectNode") }.size == 12)
     }
 
     @Test
@@ -280,7 +280,7 @@ class PointsToAnalysisTests {
         println("# binTreeCycle graal graphs")
         val methodToGraph = MethodToGraph()
         val graph = methodToGraph.getCFG(::binTreeCycle.javaMethod)
-        val adapter = GraalAdapter.fromGraal(graph)
+        val adapter = GraalIRGraph.fromGraal(graph)
         val writer = StringWriter()
         adapter.exportQuery(writer)
         println(writer.toString())
@@ -294,14 +294,14 @@ class PointsToAnalysisTests {
         analysis.printGraph()
         println()
         val graph = analysis.pointsToGraph
-        assert(3 == graph.vertexSet().filter { it.isType("AllocatedObjectNode") }.size)
+        assert(3 == graph.vertexSet().filterIsInstance<AnalysisNode.IR>().filter { it.isType("AllocatedObjectNode") }.size)
     }
 
     @Test
     fun `get graal graphs for addRangeToBinTree`() {
         val methodToGraph = MethodToGraph()
         val graph = methodToGraph.getCFG(::binTreeCycle.javaMethod)
-        val adapter = GraalAdapter.fromGraal(graph)
+        val adapter = GraalIRGraph.fromGraal(graph)
         val writer = StringWriter()
         adapter.exportQuery(writer)
         println(writer.toString())

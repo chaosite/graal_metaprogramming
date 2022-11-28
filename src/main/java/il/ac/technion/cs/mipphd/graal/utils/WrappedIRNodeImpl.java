@@ -3,16 +3,12 @@ package il.ac.technion.cs.mipphd.graal.utils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.graalvm.compiler.graph.Node;
+import org.graalvm.compiler.nodeinfo.Verbosity;
 
 import java.util.Arrays;
 import java.util.List;
 
-public class NodeWrapper {
-    private final Node node;
-
-    public NodeWrapper(Node node) {
-        this.node = node;
-    }
+public record WrappedIRNodeImpl(Node node) implements WrappedIRNode {
 
     @Override
     public boolean equals(Object o) {
@@ -20,7 +16,7 @@ public class NodeWrapper {
 
         if (o == null || getClass() != o.getClass()) return false;
 
-        NodeWrapper that = (NodeWrapper) o;
+        WrappedIRNodeImpl that = (WrappedIRNodeImpl) o;
 
         return new EqualsBuilder().append(node, that.node).isEquals();
     }
@@ -30,15 +26,15 @@ public class NodeWrapper {
         return new HashCodeBuilder(17, 37).append(node).toHashCode();
     }
 
-    public Node getNode() {
-        return node;
-    }
-
     @Override
     public String toString() {
         return "NodeWrapper{" +
                 "node=" + node +
                 '}';
+    }
+
+    public String shortToString() {
+        return node.toString(Verbosity.Long);
     }
 
     public Boolean isType(String className) {
@@ -67,7 +63,7 @@ public class NodeWrapper {
         return false;
     }
 
-    public int getId() {
-        return this.node.getId();
+    public String getId() {
+        return this.node.toString(Verbosity.Id);
     }
 }

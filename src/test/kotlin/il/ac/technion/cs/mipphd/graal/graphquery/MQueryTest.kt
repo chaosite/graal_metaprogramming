@@ -2,7 +2,7 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.Listable
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
+import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl
 import il.ac.technion.cs.mipphd.graal.utils.NodeWrapperUtils
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit5.MockKExtension
@@ -193,7 +193,8 @@ internal class MQueryTest {
         private val methodToGraph = MethodToGraph()
         private val maximum = Listable::maximum.javaMethod
         private val maximumGraph = methodToGraph.getCFG(maximum)
-        private val invokeNode = NodeWrapper(maximumGraph.asCFG().graph.nodes.filterIsInstance<Invoke>()[0] as Node)
+        private val invokeNode =
+            AnalysisNode.IR(WrappedIRNodeImpl(maximumGraph.asCFG().graph.nodes.filterIsInstance<Invoke>()[0] as Node))
         private val invokeQueryTarget = QueryTargetNode(invokeNode)
 
         @Test

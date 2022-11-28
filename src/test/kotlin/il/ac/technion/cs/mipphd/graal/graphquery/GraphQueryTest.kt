@@ -41,29 +41,7 @@ val repeatedNodesQueryText = """
 
 internal class GraphQueryTest {
     val methodToGraph = MethodToGraph()
-    val maximum = Listable::maximum.javaMethod
-    val maximumQuery = GraphMaker.createMaxGraph()
-
-    @Test
-    fun `all nodes in query match some node in actual graph`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        val set = mutableSetOf(*cfg.asCFG().graph.nodes.toList().toTypedArray())
-        maximumQuery.vertexSet().forEach { queryNode ->
-            assertTrue(set.any { (queryNode as GraphQueryVertex<*>).match(it) }, "Couldn't find $queryNode")
-        }
-    }
-
-    @Test
-    fun `maximum query matches maximum function ir`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        assertEquals(18, maximumQuery.match(cfg).size)
-    }
-
-    @Test
-    fun `minimal query matches maximum function ir`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        assertEquals(2, GraphMaker.createMinimalQuery().match(cfg).size)
-    }
+    private val maximum = Listable::maximum.javaMethod
 
     @Test
     fun `repeated query matches maximum function ir`() {
@@ -73,28 +51,6 @@ internal class GraphQueryTest {
         println(results)
 
         assertEquals(19, results.size)
-    }
-
-    @Test
-    fun `two vertex one edge query matches maximum function ir`() {
-        val cfg = methodToGraph.getCFG(maximum)
-        assertEquals(2, GraphMaker.createTwoVertexOneEdgeQuery().match(cfg).size)
-    }
-
-    @Test
-    fun `export does not throw`() {
-        val writer = StringWriter()
-        GraphMaker.createMaxGraph().exportQuery(writer)
-        println(writer.buffer.toString())
-    }
-
-    @Test
-    fun `export-import round trip does not throw`() {
-        val writer = StringWriter()
-        GraphMaker.createMaxGraph().exportQuery(writer)
-        val exported = writer.buffer.toString()
-        val reader = StringReader(exported)
-        GraphQuery.importQuery(reader)
     }
 
     @Test
@@ -109,7 +65,7 @@ internal class GraphQueryTest {
 
         val set = mutableSetOf(*cfg.asCFG().graph.nodes.toList().toTypedArray())
         query.vertexSet().forEach { queryNode ->
-            assertTrue(set.any { (queryNode as GraphQueryVertex<*>).match(it) }, "Couldn't find $queryNode")
+            assertTrue(set.any(queryNode::match), "Couldn't find $queryNode")
         }
         assertEquals(18, query.match(cfg).size)
     }

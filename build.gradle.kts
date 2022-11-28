@@ -15,12 +15,13 @@ allprojects {
 val graalVersion = "22.3.0"
 val jgraphtVersion = "1.5.1"
 val junitVersion = "5.9.0"
+// Staying at 17 for now because Gradle doesn't support Java 19
+val javaVersion = JavaVersion.VERSION_17
 
 val apronLocation = "/home/mip/phd/repos/apron/prefix"
 val elinaLocation = "/home/mip/phd/repos/ELINA"
 
 dependencies {
-    implementation(kotlin("stdlib-jdk8"))
     implementation(kotlin("reflect"))
 
     // ReactiveX
@@ -61,7 +62,7 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.23.1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
-    testImplementation("org.amshove.kluent:kluent:1.70")
+    testImplementation("org.amshove.kluent:kluent:1.72")
     testImplementation("io.mockk:mockk:1.13.2")
 }
 
@@ -99,24 +100,30 @@ val moduleArgs = listOf(
     "--add-exports", "jdk.internal.vm.compiler/org.graalvm.compiler.nodes.extended=ALL-UNNAMED"
 )
 
+
+java {
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+}
+
 tasks {
     compileJava {
         options.apply {
-            compilerArgs = moduleArgs
+            compilerArgs = moduleArgs + "-Xlint:deprecation"
         }
     }
     compileTestJava {
         options.apply {
-            compilerArgs = moduleArgs
+            compilerArgs = moduleArgs + "-Xlint:deprecation"
         }
     }
 
     compileKotlin {
-        kotlinOptions.jvmTarget = "17"
+        kotlinOptions.jvmTarget = javaVersion.toString()
         kotlinOptions.freeCompilerArgs = listOf("-Xextended-compiler-checks")
     }
     compileTestKotlin {
-        kotlinOptions.jvmTarget = "17"
+        kotlinOptions.jvmTarget = javaVersion.toString()
         kotlinOptions.freeCompilerArgs = listOf("-Xextended-compiler-checks")
     }
 

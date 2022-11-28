@@ -1,8 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.utils;
 
-import il.ac.technion.cs.mipphd.graal.utils.CFGWrapper;
-import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter;
-import il.ac.technion.cs.mipphd.graal.utils.MethodWrapper;
+import il.ac.technion.cs.mipphd.graal.graphquery.AnalysisGraph;
 import jdk.vm.ci.meta.MetaAccessProvider;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
 import jdk.vm.ci.runtime.JVMCI;
@@ -88,6 +86,22 @@ public class MethodToGraph {
         return getCFG(method.getResolvedJavaMethod());
     }
 
+    public GraalIRGraph getGraalIRGraph(CFGWrapper cfg) {
+        return GraalIRGraph.fromGraal(cfg);
+    }
+
+    public GraalIRGraph getGraalIRGraph(Method method) {
+        return getGraalIRGraph(getCFG((method)));
+    }
+
+    public AnalysisGraph getAnalysisGraph(CFGWrapper cfg) {
+        return AnalysisGraph.Companion.fromIR(getGraalIRGraph(cfg));
+    }
+
+    public AnalysisGraph getAnalysisGraph(Method method) {
+        return getAnalysisGraph(getCFG(method));
+    }
+
     public void printCFG(ControlFlowGraph cfg) {
         for (Block block : cfg.getBlocks()) {
             System.out.println();
@@ -95,8 +109,8 @@ public class MethodToGraph {
         }
     }
 
-    public GraalAdapter getAdaptedCFG(Method method) {
-        return GraalAdapter.fromGraal(getCFG(method));
+    public GraalIRGraph getAdaptedCFG(Method method) {
+        return GraalIRGraph.fromGraal(getCFG(method));
     }
 
     static private GraalRuntime initializeRuntime() {

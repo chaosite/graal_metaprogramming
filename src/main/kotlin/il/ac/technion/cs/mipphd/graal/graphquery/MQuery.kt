@@ -7,13 +7,12 @@ import com.github.h0tk3y.betterParse.grammar.parser
 import com.github.h0tk3y.betterParse.lexer.literalToken
 import com.github.h0tk3y.betterParse.lexer.regexToken
 import com.github.h0tk3y.betterParse.parser.Parser
-import com.github.h0tk3y.betterParse.utils.Tuple2
-import il.ac.technion.cs.mipphd.graal.utils.EdgeWrapper
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
+import il.ac.technion.cs.mipphd.graal.utils.WrappedIREdge
+import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl
 
 sealed class QueryTarget
-data class QueryTargetNode(val node: NodeWrapper) : QueryTarget()
-data class QueryTargetEdge(val source: NodeWrapper, val edge: EdgeWrapper) : QueryTarget()
+data class QueryTargetNode(val node: AnalysisNode) : QueryTarget()
+data class QueryTargetEdge(val source: AnalysisNode, val edge: AnalysisEdge) : QueryTarget()
 
 sealed class MQuery {
     fun interpret(target: QueryTarget): Boolean {

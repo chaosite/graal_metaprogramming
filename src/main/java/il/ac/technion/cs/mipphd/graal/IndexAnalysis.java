@@ -1,7 +1,7 @@
 package il.ac.technion.cs.mipphd.graal;
 
-import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter;
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper;
+import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph;
+import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodes.Invoke;
 import org.graalvm.compiler.nodes.ValuePhiNode;
@@ -12,7 +12,7 @@ import java.util.*;
 public class IndexAnalysis extends BackwardsAnalysis<HashSet<Node>> {
     private final List<Invoke> results = new ArrayList<>();
 
-    public IndexAnalysis(GraalAdapter graph, List<NodeWrapper> nodes, List<NodeWrapper> entryPoints, List<NodeWrapper> exitPoints) {
+    public IndexAnalysis(GraalIRGraph graph, List<WrappedIRNodeImpl> nodes, List<WrappedIRNodeImpl> entryPoints, List<WrappedIRNodeImpl> exitPoints) {
         super(graph, nodes, entryPoints, exitPoints);
     }
 
@@ -39,7 +39,7 @@ public class IndexAnalysis extends BackwardsAnalysis<HashSet<Node>> {
     }
 
     @Override
-    protected void flow(HashSet<Node> input, NodeWrapper d, HashSet<Node> out) {
+    protected void flow(HashSet<Node> input, WrappedIRNodeImpl d, HashSet<Node> out) {
        /* out.addAll(input);
         List<Node> nodes = StreamSupport.stream(d.getNode().asNode().getNodes().spliterator(), false).collect(Collectors.toList());
         Collections.reverse(nodes);

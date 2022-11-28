@@ -1,7 +1,5 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
-import il.ac.technion.cs.mipphd.graal.domains.mccarthy91
-import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
 import org.junit.jupiter.api.Test
 import kotlin.reflect.jvm.javaMethod

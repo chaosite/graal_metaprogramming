@@ -1,10 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.graphquery.pointsto
 
-import il.ac.technion.cs.mipphd.graal.utils.EdgeWrapper
-import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
-import org.graalvm.compiler.nodes.java.LoadFieldNode
-import org.graalvm.compiler.nodes.java.StoreFieldNode
+import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl
 
 //interface PointsToFactory {
 //    fun addAllocatedObjectNode(store: NodeWrapper, alloc: NodeWrapper): PointsToFactory
@@ -13,6 +9,6 @@ import org.graalvm.compiler.nodes.java.StoreFieldNode
 //    fun getGraph(): GraalAdapter
 //}
 
-fun pointsToGraph1(results: List<Pair<NodeWrapper, NodeWrapper>>) {
+fun pointsToGraph1(results: List<Pair<WrappedIRNodeImpl, WrappedIRNodeImpl>>) {
 
 }

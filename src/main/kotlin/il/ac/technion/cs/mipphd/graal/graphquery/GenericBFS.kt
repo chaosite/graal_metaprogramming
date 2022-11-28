@@ -1,8 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
 import arrow.core.Either
-import il.ac.technion.cs.mipphd.graal.utils.GraalAdapter
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper
 import org.jgrapht.Graph
 import org.jgrapht.GraphTests
 
@@ -11,10 +9,10 @@ enum class Direction {
     BACKWARDS
 }
 
-typealias MatchedNodes = Either<NodeWrapper, List<NodeWrapper>>
+typealias MatchedNodes = Either<AnalysisNode, List<AnalysisNode>>
 
-fun possibleChildrenMatches(query: GraphQuery, graph: GraalAdapter, queryV: GraphQueryVertex<*>, graphV: NodeWrapper):
-        List<Map<GraphQueryVertex<*>, List<MatchedNodes>>> =
+fun possibleChildrenMatches(query: GraphQuery, graph: AnalysisGraph, queryV: GraphQueryVertex, graphV: AnalysisNode):
+        List<Map<GraphQueryVertex, List<MatchedNodes>>> =
     listOf(query.edgesOf(queryV).mapNotNull { qe ->
         val dir = if (query.getEdgeSource(qe) == queryV) Direction.FORWARDS else Direction.BACKWARDS
         val queryW = directionToEdgeFunction(query, dir)(qe)
@@ -43,16 +41,16 @@ fun possibleChildrenMatches(query: GraphQuery, graph: GraalAdapter, queryV: Grap
             )
     }.toMap())
 
-private fun originOrLast(it: MatchedNodes): NodeWrapper =
+private fun originOrLast(it: MatchedNodes): AnalysisNode =
     when (it) {
         is Either.Left -> it.value; is Either.Right -> it.value.last()
     }
 
 fun singleStep(
-    graph: GraalAdapter,
+    graph: AnalysisGraph,
     queryE: GraphQueryEdge,
-    queryW: GraphQueryVertex<*>,
-    graphV: NodeWrapper,
+    queryW: GraphQueryVertex,
+    graphV: AnalysisNode,
     dir: Direction,
 ): List<MatchedNodes> =
     directionToEdgesOfFunction(graph, dir)(graphV)
@@ -73,16 +71,16 @@ private fun <V, E> directionToEdgeFunction(graph: Graph<V, E>, dir: Direction) =
 }
 
 fun kleeneTransitiveClosure(
-    graph: GraalAdapter,
+    graph: AnalysisGraph,
     queryE: GraphQueryEdge,
-    queryW: GraphQueryVertex<*>,
-    graphStart: NodeWrapper,
+    queryW: GraphQueryVertex,
+    graphStart: AnalysisNode,
     dir: Direction,
 ): List<MatchedNodes> {
     assert(dir == Direction.FORWARDS) // TODO: Handle backwards Kleene?
-    val queue = ArrayDeque<List<NodeWrapper>>()
-    val visited = mutableSetOf<NodeWrapper>()
-    val ret: MutableList<Either<NodeWrapper, List<NodeWrapper>>> = mutableListOf(Either.Left(graphStart))
+    val queue = ArrayDeque<List<AnalysisNode>>()
+    val visited = mutableSetOf<AnalysisNode>()
+    val ret: MutableList<Either<AnalysisNode, List<AnalysisNode>>> = mutableListOf(Either.Left(graphStart))
     val firstSteps = singleStep(graph, queryE, queryW, graphStart, dir)
     ret.addAll(firstSteps)
     queue.addAll(firstSteps.map { it.orNull()!! })
@@ -106,7 +104,7 @@ fun kleeneTransitiveClosure(
     return ret
 }
 
-fun permutations(options: Map<GraphQueryVertex<*>, List<MatchedNodes>>): List<Map<GraphQueryVertex<*>, MatchedNodes>> {
+fun permutations(options: Map<GraphQueryVertex, List<MatchedNodes>>): List<Map<GraphQueryVertex, MatchedNodes>> {
     if (options.isEmpty())
         return listOf(mapOf())
     val queryVertices = options.keys.toList()
@@ -128,30 +126,30 @@ fun <T> cartesianProduct(vararg sets: Set<T>): Set<List<T>> =
 
 fun bfsMatch(
     query: GraphQuery,
-    graph: GraalAdapter,
-    queryStart: GraphQueryVertex<*>,
-): List<Map<GraphQueryVertex<*>, List<NodeWrapper>>> {
+    graph: AnalysisGraph,
+    queryStart: GraphQueryVertex,
+): List<Map<GraphQueryVertex, List<AnalysisNode>>> {
     if (!GraphTests.isConnected(query))
         throw RuntimeException("Query is not weakly-connected - this is an error.")
-    if (queryStart is GraphQueryVertexM) {
-        val metadata = queryStart.mQuery as Metadata
-        if (metadata.options.contains(MetadataOption.Repeated))
-            throw RuntimeException("Shouldn't start the BFS on a repeated node, pick another")
-    }
+
+    val metadata = queryStart.mQuery as Metadata
+    if (metadata.options.contains(MetadataOption.Repeated))
+        throw RuntimeException("Shouldn't start the BFS on a repeated node, pick another")
+
     return graph.vertexSet().filter(queryStart::match).flatMap { bfsMatch(query, graph, queryStart, it) }
 }
 
 data class WorkItem(
-    val matches: Map<GraphQueryVertex<*>, MatchedNodes>,
-    val queue: List<Pair<GraphQueryVertex<*>, MatchedNodes>>,
+    val matches: Map<GraphQueryVertex, MatchedNodes>,
+    val queue: List<Pair<GraphQueryVertex, MatchedNodes>>,
 )
 
 fun bfsMatch(
     query: GraphQuery,
-    graph: GraalAdapter,
-    queryStart: GraphQueryVertex<*>,
-    graphStart: NodeWrapper,
-): List<Map<GraphQueryVertex<*>, List<NodeWrapper>>> {
+    graph: AnalysisGraph,
+    queryStart: GraphQueryVertex,
+    graphStart: AnalysisNode,
+): List<Map<GraphQueryVertex, List<AnalysisNode>>> {
     val workset = ArrayDeque<WorkItem>()
     possibleChildrenMatches(query, graph, queryStart, graphStart).map(::permutations).forEach { options ->
         options.forEach {
@@ -163,7 +161,7 @@ fun bfsMatch(
             )
         }
     }
-    val fullMatches = mutableListOf<Map<GraphQueryVertex<*>, List<NodeWrapper>>>()
+    val fullMatches = mutableListOf<Map<GraphQueryVertex, List<AnalysisNode>>>()
 
     while (!workset.isEmpty()) {
         val (matches, queue) = workset.removeFirst()
@@ -187,7 +185,8 @@ fun bfsMatch(
                 if (childrenMatch.filter { newMatches.containsKey(it.key) }
                         .all { (q, m) ->
                             (newMatches[q] == m) /* normal case */ ||
-                                    (originOrLast(newMatches[q]!!) == m.orNull()?.last()) /* backward match to end of kleene */
+                                    (originOrLast(newMatches[q]!!) == m.orNull()
+                                        ?.last()) /* backward match to end of kleene */
                         })
                     workset.add(
                         WorkItem(
@@ -204,9 +203,9 @@ fun bfsMatch(
 
 fun groupRepeated(
     query: GraphQuery,
-    matches: List<Map<GraphQueryVertex<*>, List<NodeWrapper>>>
-): List<Map<GraphQueryVertex<*>, List<NodeWrapper>>> {
-    val repeatedQueryNodes = query.vertexSet().filterIsInstance<GraphQueryVertexM>()
+    matches: List<Map<GraphQueryVertex, List<AnalysisNode>>>
+): List<Map<GraphQueryVertex, List<AnalysisNode>>> {
+    val repeatedQueryNodes = query.vertexSet()
         .filter { (it.mQuery as Metadata).options.contains(MetadataOption.Repeated) }
     return matches
         .groupBy { match -> match.filterKeys { key -> !repeatedQueryNodes.contains(key) } }

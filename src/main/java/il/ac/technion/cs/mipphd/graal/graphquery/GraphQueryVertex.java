@@ -1,58 +1,84 @@
 package il.ac.technion.cs.mipphd.graal.graphquery;
 
-import il.ac.technion.cs.mipphd.graal.utils.NodeWrapper;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl;
 import org.graalvm.compiler.graph.Node;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
-import java.util.function.Predicate;
 
-public class GraphQueryVertex<T extends Node> {
-    private final Class<T> clazz;
-    private Predicate<Node> predicate;
-    private String name = "n" + this.hashCode();
+public class GraphQueryVertex {
+    @NonNull
+    private MQuery mQuery;
 
-    @SuppressWarnings("unchecked")
-    public GraphQueryVertex(Class<T> clazz, Predicate<T> predicate) {
-        this.clazz = clazz;
-        this.predicate = (Predicate<Node>) predicate;
+    public GraphQueryVertex(@NotNull MQuery mQuery) {
+        this.mQuery = mQuery;
     }
 
-    public void setName(String name) { this.name = name; }
-    public String getName() { return name; }
-
-    public Class<T> getClazz() {
-        return clazz;
+    @NonNull
+    public static GraphQueryVertex fromQuery(@NonNull String query) {
+        return new GraphQueryVertex(MQueryKt.parseMQuery(query));
     }
 
-    @SuppressWarnings("unchecked")
-    public void setPredicate(Predicate<? extends Node> predicate) {
-        this.predicate = (Predicate<Node>) predicate;
+    @NonNull
+    public static GraphQueryVertex fromName(@NonNull String name) {
+        GraphQueryVertex v = fromQuery("1 = 1");
+        v.setName(name);
+        return v;
     }
 
-    public boolean match(Node value) {
-        if (this.clazz.isAssignableFrom(value.getClass())) {
-            return this.predicate.test(value);
-        }
-        return false;
+    @NonNull
+    public MQuery getMQuery() {
+        return mQuery;
     }
 
-    public boolean match(NodeWrapper value) {
-        return match(value.getNode());
+    public void setMQuery(@NonNull MQuery mQuery) {
+        this.mQuery = mQuery;
+    }
+
+    @NonNull
+    public String label() {
+        return mQuery.serialize();
+    }
+
+    @NonNull
+    public Optional<String> captureGroup() {
+        Metadata metadata = (Metadata) this.mQuery;
+        return metadata.getOptions().stream()
+                .filter(option -> option instanceof MetadataOption.CaptureName)
+                .map(captureName -> ((MetadataOption.CaptureName) captureName).getName())
+                .findAny();
     }
 
     @Override
     public String toString() {
         return "GraphQueryVertex{" +
-                "clazz=" + clazz +
+                "mQuery=" + mQuery.serialize() +
                 '}';
     }
 
-    public String label() {
-        return "is('" + clazz.getCanonicalName().replaceFirst("org[.]graalvm[.]compiler[.]nodes[.]", "") + "')";
+    private String name = "n" + this.hashCode();
+
+
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public Optional<String> captureGroup() {
-        return Optional.empty();
+    public String getName() {
+        return name;
+    }
+
+
+    public boolean match(Node value) {
+        return match(new WrappedIRNodeImpl(value));
+    }
+
+    public boolean match(WrappedIRNodeImpl value) {
+        return match(new AnalysisNode.IR(value));
+    }
+
+    public boolean match(AnalysisNode value) {
+        return mQuery.interpret(new QueryTargetNode(value));
     }
 
     /* do not override equals/hashCode! */
