@@ -189,7 +189,7 @@ class PointsToAnalysisTests {
 //        val graph = methodToGraph.getCFG(::anyHolder.javaMethod)
 //        val adapter = GraalAdapter.fromGraal(graph)
 //        val writer = StringWriter()
-//        adapter.exportQuery(writer)
+//        adapter.export(writer)
 //        println(writer.toString())
 //        println()
 //    }

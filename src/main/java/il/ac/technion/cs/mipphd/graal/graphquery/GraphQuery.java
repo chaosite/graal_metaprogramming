@@ -13,6 +13,7 @@ import org.jgrapht.nio.dot.DOTImporter;
 
 import java.io.Reader;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,8 +29,7 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex, GraphQuery
     }
 
     protected Stream<Map<GraphQueryVertex, List<AnalysisNode>>> _match(AnalysisGraph cfg) {
-        return GenericBFSKt.bfsMatch(this, cfg, this.startCandidate(cfg)).stream()
-                .map(v -> (Map<GraphQueryVertex, List<AnalysisNode>>) v);
+        return GenericBFSKt.bfsMatch(this, cfg, this.startCandidate(cfg)).stream();
     }
 
     public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(GraalIRGraph cfg) {
@@ -61,7 +61,7 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex, GraphQuery
         return e;
     }
 
-    private GraphQueryVertex startCandidate(AnalysisGraph cfg) {
+    private @NonNull  GraphQueryVertex startCandidate(@NonNull AnalysisGraph cfg) {
         final Set<AnalysisNode> nodes = new HashSet<>(cfg.vertexSet());
         Optional<GraphQueryVertex> root = this.vertexSet().stream()
                 .filter(v -> !((Metadata) v.getMQuery()).getOptions().contains(MetadataOption.Repeated.INSTANCE) )
@@ -80,7 +80,13 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex, GraphQuery
         return histogram.get(histogram.keySet().stream().min(Comparator.naturalOrder()).get()).get(0);
     }
 
-    public void exportQuery(Writer output) {
+    public String export() {
+        StringWriter sw = new StringWriter();
+        export(sw);
+        return sw.toString();
+    }
+
+    public void export(@NonNull Writer output) {
         DOTExporter<GraphQueryVertex, GraphQueryEdge> exporter =
                 new DOTExporter<>(GraphQueryVertex::getName);
 

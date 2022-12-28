@@ -34,6 +34,9 @@ sealed class AnalysisNode private constructor() {
         override val index: Int
             get() = id.toInt()
 
+        override val nodeName: String
+            get() = "ir${index}"
+
         override fun toString() = "${this.javaClass.simpleName}(${wrappedNode.shortToString()})"
 
         val isMerge: Boolean
@@ -55,6 +58,12 @@ sealed class AnalysisNode private constructor() {
 
     open val index: Int
         get() = hashCode()
+
+    /**
+     * Name of the node, for use when exporting in GraphViz format.
+     */
+    open val nodeName: String
+        get() = "${this.javaClass.simpleName}${index}"
 
     override fun toString() = "${this.javaClass.simpleName}{..}"
 }

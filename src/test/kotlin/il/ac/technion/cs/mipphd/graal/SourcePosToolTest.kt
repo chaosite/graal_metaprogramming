@@ -3,6 +3,7 @@ package il.ac.technion.cs.mipphd.graal
 import il.ac.technion.cs.mipphd.graal.graphquery.*
 import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
+import il.ac.technion.cs.mipphd.graal.utils.SourcePosTool
 import org.graalvm.compiler.nodes.ValueNode
 import org.junit.jupiter.api.Test
 import java.io.StringReader

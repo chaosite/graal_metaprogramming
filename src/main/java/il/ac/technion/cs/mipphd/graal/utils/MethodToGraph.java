@@ -1,5 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.utils;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import il.ac.technion.cs.mipphd.graal.graphquery.AnalysisGraph;
 import jdk.vm.ci.meta.MetaAccessProvider;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
@@ -37,14 +38,39 @@ public class MethodToGraph {
     private final Backend backend = runtimeProvider.getHostBackend();
     private final MetaAccessProvider metaAccess = backend.getMetaAccess();
 
-    protected StructuredGraph getEmptyGraph(ResolvedJavaMethod method) {
+    private boolean optimize = false;
+
+    public MethodToGraph() {
+        this(true);
+    }
+    public MethodToGraph(boolean optimize) {
+        this.optimize = optimize;
+    }
+
+    static private @NonNull GraalRuntime initializeRuntime() {
+        Services.initializeJVMCI();
+        JVMCICompiler compiler = JVMCI.getRuntime().getCompiler();
+        if (compiler instanceof GraalJVMCICompiler)
+            return ((GraalJVMCICompiler) compiler).getGraalRuntime();
+        return new InvalidGraalRuntime();
+    }
+
+    public boolean isOptimize() {
+        return optimize;
+    }
+
+    public void setOptimize(boolean optimize) {
+        this.optimize = optimize;
+    }
+
+    protected @NonNull StructuredGraph getEmptyGraph(@NonNull ResolvedJavaMethod method) {
         return graphBuilder
                 .method(method)
                 .compilationId(backend.getCompilationIdentifier(method))
                 .build();
     }
 
-    protected StructuredGraph getGraph(ResolvedJavaMethod method) {
+    protected @NonNull StructuredGraph getGraph(@NonNull ResolvedJavaMethod method) {
         StructuredGraph graph = getEmptyGraph(method);
         GraphBuilderConfiguration.Plugins gbcPlugins = new GraphBuilderConfiguration.Plugins(new InvocationPlugins());
         GraphBuilderConfiguration graphBuilderConfiguration = GraphBuilderConfiguration.getDefault(gbcPlugins)
@@ -55,70 +81,64 @@ public class MethodToGraph {
         graphBuilder.apply(graph);
         graph.maybeCompress();
 
-        PhaseSuite<HighTierContext> graphBuilderSuite = backend.getSuites().getDefaultGraphBuilderSuite();
-        CommunityCompilerConfiguration config = new CommunityCompilerConfiguration();
-        HighTierContext highTierContext = new HighTierContext(backend.getProviders(), graphBuilderSuite, OptimisticOptimizations.NONE);
+        if (optimize) {
+            PhaseSuite<HighTierContext> graphBuilderSuite = backend.getSuites().getDefaultGraphBuilderSuite();
+            CommunityCompilerConfiguration config = new CommunityCompilerConfiguration();
+            HighTierContext highTierContext = new HighTierContext(backend.getProviders(), graphBuilderSuite, OptimisticOptimizations.NONE);
 
-        PhaseSuite<HighTierContext> tier = config.createHighTier(options);
-        tier.removePhase(LoweringPhase.class);
-        tier.apply(graph, highTierContext);
-        graph.maybeCompress();
+            PhaseSuite<HighTierContext> tier = config.createHighTier(options);
+            tier.removePhase(LoweringPhase.class);
+            tier.apply(graph, highTierContext);
+            graph.maybeCompress();
+        }
         return graph;
     }
 
-    public MethodWrapper lookupJavaMethodToWrapper(Method method) {
+    public @NonNull MethodWrapper lookupJavaMethodToWrapper(Method method) {
         return new MethodWrapper(metaAccess.lookupJavaMethod(method));
     }
 
-    private ResolvedJavaMethod lookupJavaMethod(Method method) {
+    private @NonNull ResolvedJavaMethod lookupJavaMethod(Method method) {
         return metaAccess.lookupJavaMethod(method);
     }
 
-    public CFGWrapper getCFG(Method method) {
+    public @NonNull CFGWrapper getCFG(Method method) {
         return getCFG(lookupJavaMethod(method));
     }
 
-    private CFGWrapper getCFG(ResolvedJavaMethod method) {
+    private @NonNull CFGWrapper getCFG(ResolvedJavaMethod method) {
         return new CFGWrapper(ControlFlowGraph.compute(getGraph(method), true, true, true, true));
     }
 
-    public CFGWrapper getCFGFromWrapper(MethodWrapper method) {
+    public @NonNull CFGWrapper getCFGFromWrapper(@NonNull MethodWrapper method) {
         return getCFG(method.getResolvedJavaMethod());
     }
 
-    public GraalIRGraph getGraalIRGraph(CFGWrapper cfg) {
+    public @NonNull GraalIRGraph getGraalIRGraph(@NonNull CFGWrapper cfg) {
         return GraalIRGraph.fromGraal(cfg);
     }
 
-    public GraalIRGraph getGraalIRGraph(Method method) {
+    public @NonNull GraalIRGraph getGraalIRGraph(Method method) {
         return getGraalIRGraph(getCFG((method)));
     }
 
-    public AnalysisGraph getAnalysisGraph(CFGWrapper cfg) {
+    public @NonNull AnalysisGraph getAnalysisGraph(@NonNull CFGWrapper cfg) {
         return AnalysisGraph.Companion.fromIR(getGraalIRGraph(cfg));
     }
 
-    public AnalysisGraph getAnalysisGraph(Method method) {
+    public @NonNull AnalysisGraph getAnalysisGraph(Method method) {
         return getAnalysisGraph(getCFG(method));
     }
 
-    public void printCFG(ControlFlowGraph cfg) {
+    public void printCFG(@NonNull ControlFlowGraph cfg) {
         for (Block block : cfg.getBlocks()) {
             System.out.println();
             System.out.println(block.toString(Verbosity.All));
         }
     }
 
-    public GraalIRGraph getAdaptedCFG(Method method) {
+    public @NonNull GraalIRGraph getAdaptedCFG(Method method) {
         return GraalIRGraph.fromGraal(getCFG(method));
-    }
-
-    static private GraalRuntime initializeRuntime() {
-        Services.initializeJVMCI();
-        JVMCICompiler compiler = JVMCI.getRuntime().getCompiler();
-        if (compiler instanceof GraalJVMCICompiler)
-            return ((GraalJVMCICompiler) compiler).getGraalRuntime();
-        return new InvalidGraalRuntime();
     }
 
     private static class InvalidGraalRuntime implements GraalRuntime {

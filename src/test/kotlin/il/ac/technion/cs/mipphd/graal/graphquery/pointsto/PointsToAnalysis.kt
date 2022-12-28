@@ -205,7 +205,7 @@ digraph G {
 
     fun printGraph() {
         val sw = StringWriter()
-//        pointsToGraph.exportQuery(sw)
+//        pointsToGraph.export(sw)
         writeQueryInternal(pointsToGraph, sw)
         println(sw.buffer)
     }

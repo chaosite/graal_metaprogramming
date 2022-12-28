@@ -63,7 +63,7 @@ data class Condition(
     }
 }
 
-data class ElinaDataNode(
+class ElinaDataNode(
     val symbolicExpression: SymbolicLinExpr = SymbolicLinExpr(listOf(), 0.toMpq())
 )
     : AnalysisNode.Specific()
@@ -125,10 +125,11 @@ digraph G {
             else -> SymbolicLinExpr(listOf(), 0.toMpq()) // TODO: Probably not important...
         }
         var foo = graph.outgoingEdgesOf(node).map(graph::getEdgeTarget).find { it is ElinaDataNode }
-        if (foo == null)
+        if (foo == null) {
             foo = ElinaDataNode(symbolicExpression = newSym)
-        graph.addVertex(foo)
-        graph.addEdge(node, foo, ElinaEdge())
+            graph.addVertex(foo)
+            graph.addEdge(node, foo, ElinaEdge())
+        }
 
         state[node] = Item(
             "$xText ${arithmeticNodeToText(node)} $yText",

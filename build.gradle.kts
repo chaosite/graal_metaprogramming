@@ -142,5 +142,9 @@ tasks {
             libraryPath += ":$elinaLocation/lib"
         systemProperty("java.library.path", libraryPath)
         environment("LD_LIBRARY_PATH", libraryPath)
+
+        testLogging {
+            showStandardStreams = true
+        }
     }
 }

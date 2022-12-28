@@ -1,14 +1,23 @@
 package il.ac.technion.cs.mipphd.graal.utils;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodeinfo.Verbosity;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-public record WrappedIRNodeImpl(Node node) implements WrappedIRNode {
+public class WrappedIRNodeImpl implements WrappedIRNode {
+    Set<String> memoized = new HashSet<>();
+    private final Node node;
+
+    public WrappedIRNodeImpl(Node node) {
+        this.node = node;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -37,7 +46,14 @@ public record WrappedIRNodeImpl(Node node) implements WrappedIRNode {
         return node.toString(Verbosity.Long);
     }
 
+    @Override
+    public Node node() {
+        return node;
+    }
+
     public Boolean isType(String className) {
+        if (memoized.contains(className))
+            return true;
         boolean foundClass = false;
         String basePackage = "org.graalvm.compiler.nodes";
         // https://stackoverflow.com/questions/15893174/list-all-subpackages-of-a-package
@@ -49,6 +65,7 @@ public record WrappedIRNodeImpl(Node node) implements WrappedIRNode {
                 Class<?> clazz = Class.forName(p.getName() + "." + className);
                 foundClass = true;
                 if (clazz.isAssignableFrom(node.getClass())) {
+                    memoized.add(className);
                     return true;
                 }
             } catch (ClassNotFoundException e) {

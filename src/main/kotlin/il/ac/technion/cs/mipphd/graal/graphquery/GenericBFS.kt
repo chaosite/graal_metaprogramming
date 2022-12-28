@@ -88,6 +88,7 @@ fun kleeneTransitiveClosure(
     while (!queue.isEmpty()) {
         val path = queue.removeFirst()
         val graphV = path.last()
+        assert(path.indexOf(graphV) == path.size - 1)
         visited.add(graphV)
         graph.outgoingEdgesOf(graphV)
             .asSequence()

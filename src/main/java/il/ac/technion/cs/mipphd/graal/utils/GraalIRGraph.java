@@ -3,10 +3,7 @@ package il.ac.technion.cs.mipphd.graal.utils;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.graph.Position;
 import org.graalvm.compiler.nodeinfo.Verbosity;
-import org.graalvm.compiler.nodes.EndNode;
-import org.graalvm.compiler.nodes.LoopEndNode;
-import org.graalvm.compiler.nodes.LoopExitNode;
-import org.graalvm.compiler.nodes.ValuePhiNode;
+import org.graalvm.compiler.nodes.*;
 import org.graalvm.compiler.nodes.cfg.ControlFlowGraph;
 import org.jgrapht.graph.DirectedPseudograph;
 import org.jgrapht.nio.Attribute;
@@ -51,15 +48,16 @@ public class GraalIRGraph extends DirectedPseudograph<WrappedIRNodeImpl, Wrapped
                         success = true;
                     }
                 }
+                // So far this case has always been an EndNode to its successor
                 if (!success)
-                    g.addEdge(new WrappedIRNodeImpl(u), new WrappedIRNodeImpl(v), new WrappedIREdge(WrappedIREdge.CONTROL, "???"));
+                    g.addEdge(new WrappedIRNodeImpl(u), new WrappedIRNodeImpl(v), new WrappedIREdge(WrappedIREdge.CONTROL, "next"));
             }
             for (Node v : StreamSupport.stream(u.usages().spliterator(), false).distinct().toList()) {
                 boolean success = false;
                 for (Position position : v.inputPositions()) {
                     if (null != position.get(v) && position.get(v).equals(u)) {
                         if (position.getName().equals("loopBegin") && v instanceof LoopEndNode) {
-                            g.addEdge(new WrappedIRNodeImpl(v), new WrappedIRNodeImpl(u), new WrappedIREdge(WrappedIREdge.CONTROL, "?loop"));
+                            g.addEdge(new WrappedIRNodeImpl(v), new WrappedIRNodeImpl(u), new WrappedIREdge(WrappedIREdge.CONTROL, "next"));
                             g.addEdge(new WrappedIRNodeImpl(u), new WrappedIRNodeImpl(v), new WrappedIREdge(WrappedIREdge.ASSOCIATED, position.getName()));
                         } else if (position.getName().equals("loopBegin") && v instanceof LoopExitNode) {
                             g.addEdge(new WrappedIRNodeImpl(u), new WrappedIRNodeImpl(v), new WrappedIREdge(WrappedIREdge.ASSOCIATED, position.getName()));
@@ -70,6 +68,15 @@ public class GraalIRGraph extends DirectedPseudograph<WrappedIRNodeImpl, Wrapped
                                             .filter(n -> n instanceof LoopEndNode || n instanceof EndNode).toList()
                                             .get(position.getSubIndex());
                             g.addEdge(new WrappedIRNodeImpl(u), new WrappedIRNodeImpl(v), new WrappedIRPhiEdge(WrappedIREdge.DATA, "from " + phiSource.toString(Verbosity.Id), new WrappedIRNodeImpl(phiSource)));
+                        } else if (position.getName().equals("values") && v instanceof FrameState) {
+                            /* Do nothing in this case, these edges are polluting the graph and I don't think I need them */
+                            /* TODO: Maybe do add them? As a special type of edge can perhaps ignore? */
+                        } else if (position.getName().equals("ends") && u instanceof EndNode) {
+                            /* There already is a "next" edge, so we don't need this edge */
+                        } else if ((position.getName().equals("stateAfter") && u instanceof FrameState) ||
+                                (position.getName().equals("merge") && v instanceof ValuePhiNode) ||
+                                (!position.getName().equals("value") && v instanceof ValueProxyNode)) {
+                            g.addEdge(new WrappedIRNodeImpl(u), new WrappedIRNodeImpl(v), new WrappedIREdge(WrappedIREdge.ASSOCIATED, position.getName()));
                         } else {
                             g.addEdge(new WrappedIRNodeImpl(u), new WrappedIRNodeImpl(v), new WrappedIREdge(WrappedIREdge.DATA, position.getName()));
                         }

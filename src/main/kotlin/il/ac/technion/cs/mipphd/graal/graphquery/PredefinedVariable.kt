@@ -7,7 +7,7 @@ import kotlin.RuntimeException
 
 data class PredefinedVariable(val name: String, val type: MType, val contents: MValue)
 
-private fun createMap(vararg l: PredefinedVariable) = l.map { Pair(it.name, it) }.toMap()
+private fun createMap(vararg l: PredefinedVariable) = l.associateBy { it.name }
 private fun functionVariable(name: String, type: MType, impl: (List<MQuery>, QueryTarget) -> MValue) =
     PredefinedVariable(name, type, FunctionValue(type, impl))
 

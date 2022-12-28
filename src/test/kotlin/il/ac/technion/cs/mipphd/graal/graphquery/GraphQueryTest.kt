@@ -60,7 +60,7 @@ internal class GraphQueryTest {
 
 
         val writer = StringWriter()
-        query.exportQuery(writer)
+        query.export(writer)
         println(writer.buffer.toString())
 
         val set = mutableSetOf(*cfg.asCFG().graph.nodes.toList().toTypedArray())

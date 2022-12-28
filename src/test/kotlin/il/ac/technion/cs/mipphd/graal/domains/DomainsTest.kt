@@ -21,7 +21,7 @@ internal class DomainsTest {
     @DisplayName("Prerequisites")
     inner class PrerequisiteTests {
         private val mccarthy91Method = ::mccarthy91.javaMethod
-        private val methodToGraph = MethodToGraph()
+        private val methodToGraph = MethodToGraph(false)
         private val mccarthy91Graph = methodToGraph.getAnalysisGraph(mccarthy91Method)
 
         @Test
@@ -49,6 +49,8 @@ internal class DomainsTest {
             val finalState = results[results.keys.find { it.index == 26 }]?.polyhedralAbstractState!!.assume("phi41", ">=", 0)
 
             println("final bound for phi41: ${finalState.getBound("phi41")}")
+
+            println(mccarthy91Graph.export())
         }
 
         @Test
