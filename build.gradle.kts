@@ -1,6 +1,6 @@
 plugins {
     java
-    kotlin("jvm") version "1.7.20"
+    kotlin("jvm") version "1.8.21"
 }
 
 group = "il.ac.technion.cs"
@@ -14,9 +14,9 @@ allprojects {
 
 val graalVersion = "22.3.0"
 val jgraphtVersion = "1.5.1"
-val junitVersion = "5.9.0"
-// Staying at 17 for now because Gradle doesn't support Java 19
-val javaVersion = JavaVersion.VERSION_17
+val junitVersion = "5.9.2"
+
+val javaVersion = JavaVersion.VERSION_19
 
 val apronLocation = "/home/mip/phd/repos/apron/prefix"
 val elinaLocation = "/home/mip/phd/repos/ELINA"
@@ -39,6 +39,11 @@ dependencies {
     // jgrapht
     implementation("org.jgrapht:jgrapht-core:$jgraphtVersion")
     implementation("org.jgrapht:jgrapht-io:$jgraphtVersion")
+    constraints {
+        implementation("org.apache.commons:commons-text:1.10.0") {
+            because("CVE-2022-42889")
+        }
+    }
 
     // spotbugs annotations (for @NonNull in Java)
     implementation("com.github.spotbugs:spotbugs-annotations:4.7.3")
@@ -56,8 +61,6 @@ dependencies {
     if (File(elinaLocation).isDirectory) {
         implementation(files("$elinaLocation/java_interface/elina.jar"))
     }
-
-    implementation(files("elina.jar"))
 
     testImplementation("org.assertj:assertj-core:3.23.1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
