@@ -1,6 +1,8 @@
-package il.ac.technion.cs.mipphd.graal.graphquery
+package il.ac.technion.cs.mipphd.graal.graphquery.bfs
 
 import arrow.core.Either
+import il.ac.technion.cs.mipphd.graal.graphquery.*
+import il.ac.technion.cs.mipphd.graal.graphquery.Metadata
 import org.jgrapht.Graph
 import org.jgrapht.GraphTests
 

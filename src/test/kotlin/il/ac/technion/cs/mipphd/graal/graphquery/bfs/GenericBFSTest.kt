@@ -1,12 +1,12 @@
-package il.ac.technion.cs.mipphd.graal.graphquery
+package il.ac.technion.cs.mipphd.graal.graphquery.bfs
 
 import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph
 import il.ac.technion.cs.mipphd.graal.Listable
+import il.ac.technion.cs.mipphd.graal.graphquery.AnalysisNode
+import il.ac.technion.cs.mipphd.graal.graphquery.GraphQuery
+import il.ac.technion.cs.mipphd.graal.graphquery.anyHolder2
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
-import org.graalvm.compiler.nodes.PhiNode
-import org.graalvm.compiler.nodes.ValuePhiNode
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.io.StringWriter
@@ -48,7 +48,8 @@ internal class GenericBFSTest {
             "VirtualObjectState",
             "MaterializedObjectState"
         ).map { if (it.endsWith("State")) it else "${it}Node" }
-        val query = GraphQuery.importQuery("""
+        val query = GraphQuery.importQuery(
+            """
 digraph G {
     storeNode [ label="(?P<store>)|is('StoreFieldNode')" ];
     nop [ label="(?P<nop>)|${nopNodes.joinToString(" or ") { "is('$it')" }}" ];
@@ -57,7 +58,8 @@ digraph G {
 	value -> nop [ label="*|is('DATA')" ];
     nop -> storeNode [ label="name() = 'value'" ];
 }
-""")
+"""
+        )
         val results = bfsMatch(query, graph, query.vertexSet().last())
 
         val store = query.vertexSet().find { it.name == "storeNode" }!!
@@ -93,7 +95,8 @@ digraph G {
     @Test
     fun `finds multiple sources to LoopBegin`() {
         val graph = methodToGraph.getAnalysisGraph(::hasLoop.javaMethod)
-        val query = GraphQuery.importQuery("""
+        val query = GraphQuery.importQuery(
+            """
             digraph G {
                 sources [ label="[](?P<sources>)|" ];
                 destination [ label="(?P<destination>)|is('LoopBeginNode')" ];
@@ -101,7 +104,8 @@ digraph G {
                 
                 sources -> destination [ label = "is('CONTROL')" ];
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
 
         val results = bfsMatch(query, graph, query.vertexSet().last())
         assertEquals(1, results.size)

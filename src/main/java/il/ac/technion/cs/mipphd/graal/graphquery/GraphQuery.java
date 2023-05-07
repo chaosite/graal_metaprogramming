@@ -1,9 +1,9 @@
 package il.ac.technion.cs.mipphd.graal.graphquery;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import il.ac.technion.cs.mipphd.graal.graphquery.bfs.GenericBFSKt;
 import il.ac.technion.cs.mipphd.graal.utils.CFGWrapper;
 import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph;
-import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodes.cfg.ControlFlowGraph;
 import org.jgrapht.graph.DirectedPseudograph;
 import org.jgrapht.nio.Attribute;
@@ -28,6 +28,7 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex, GraphQuery
                 false);
     }
 
+    /* TODO: Move match methods somewhere else, now that it might not be with BFS */
     protected Stream<Map<GraphQueryVertex, List<AnalysisNode>>> _match(AnalysisGraph cfg) {
         return GenericBFSKt.bfsMatch(this, cfg, this.startCandidate(cfg)).stream();
     }
@@ -49,13 +50,13 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex, GraphQuery
         return match(cfg.asCFG());
     }
 
-    public <T extends Node> GraphQueryVertex addVertex(String mQuery) {
+    public GraphQueryVertex addVertex(String mQuery) {
         final GraphQueryVertex v = GraphQueryVertex.fromQuery(mQuery);
         this.addVertex(v);
         return v;
     }
 
-    public <T extends Node, S extends Node> GraphQueryEdge addEdge(GraphQueryVertex source, GraphQueryVertex destination, GraphQueryEdgeType type, GraphQueryEdgeMatchType matchType) {
+    public GraphQueryEdge addEdge(GraphQueryVertex source, GraphQueryVertex destination, GraphQueryEdgeType type, GraphQueryEdgeMatchType matchType) {
         final GraphQueryEdge e = new GraphQueryEdge(type, matchType);
         this.addEdge(source, destination, e);
         return e;
@@ -76,7 +77,6 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex, GraphQuery
                         .filter(n -> n instanceof AnalysisNode.IR)
                         .map(n -> (AnalysisNode.IR) n)
                         .map(AnalysisNode.IR::node).filter(v::match).count()));
-        System.out.println(histogram);
         return histogram.get(histogram.keySet().stream().min(Comparator.naturalOrder()).get()).get(0);
     }
 
