@@ -1,6 +1,7 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph
+import il.ac.technion.cs.mipphd.graal.utils.SouffleExporter
 import il.ac.technion.cs.mipphd.graal.utils.WrappedIREdge
 import il.ac.technion.cs.mipphd.graal.utils.WrappedIRPhiEdge
 import org.jgrapht.graph.DirectedPseudograph
@@ -97,6 +98,13 @@ open class AnalysisGraph :
             return g
         }
     }
+
+    fun exportSouffle(output: Writer) {
+        val exporter = SouffleExporter()
+        exporter.exportGraph(this, output)
+    }
+
+    fun exportSouffle(): String = StringWriter().also { exportSouffle(it) }.toString()
 
     fun export(output: Writer) {
         exporter.exportGraph(this, output)
