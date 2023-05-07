@@ -1,7 +1,5 @@
 package il.ac.technion.cs.mipphd.graal.graphquery
 
-import il.ac.technion.cs.mipphd.graal.utils.GraalIRGraph
-import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl
 import kotlin.reflect.KProperty
 
 private typealias CaptureGroupAction<T> = (List<AnalysisNode>) -> T?
@@ -29,10 +27,33 @@ abstract class QueryExecutor<T>(
     val initializer: () -> T,
     val dependencies: Map<Any, Map<String, Any>> = mapOf()
 ) {
+    protected inline fun <reified T : AnalysisNode.Specific> singleAttachToNode(
+        source: AnalysisNode,
+        target: T,
+        edge: AnalysisEdge.Extra
+    ): Boolean {
+        val oldTarget = graph.outgoingEdgesOf(source).map(graph::getEdgeTarget).filterIsInstance<T>().firstOrNull()
+        var changed = false
+        if (oldTarget != null && oldTarget != target) {
+            graph.removeEdge(graph.getEdge(source, oldTarget))
+            if (graph.inDegreeOf(oldTarget) == 0)
+                graph.removeVertex(oldTarget)
+            changed = true
+        }
+        if (oldTarget == null || oldTarget != target) {
+            if (!graph.containsVertex(target))
+                graph.addVertex(target)
+            graph.addEdge(source, target, edge)
+            changed = true
+        }
+        hasChanged = hasChanged || changed
+        return changed
+    }
+
     inner class MapProxy<K>(private val obj: MutableMap<K, T>) : MutableMap<K, T> by obj {
         override fun put(key: K, value: T): T? {
             if (!containsKey(key) || value != getValue(key)) {
-                hasChanged = true
+                //hasChanged = true
             }
             return obj.put(key, value)
         }
@@ -68,14 +89,14 @@ abstract class QueryExecutor<T>(
     @JvmName("WholeMatchQuery_getValue")
     protected operator fun WholeMatchQuery.getValue(thisRef: QueryExecutor<T>, property: KProperty<*>) = this
 
-    fun iterateUntilFixedPoint(limit: Int = 50): Map<AnalysisNode, T> {
-        val matches: List<Pair<String, GraphQueryMatch>> = queries
-            .flatMap { (name, query) -> query.match(graph).map { Pair(name, it) } }
+    private fun runQueries() = queries
+        .flatMap { (name, query) -> query.match(graph).map { Pair(name, it) } }
 
+    fun iterateUntilFixedPoint(limit: Int = 50): Map<AnalysisNode, T> {
         state = MapProxy(hashMapOf<AnalysisNode, T>()).withDefault { initializer() }
         for (i in 0..limit) {
             hasChanged = false
-            matches.asSequence().map(this::execute).forEach(state::putAll)
+            runQueries().asSequence().map(this::execute).forEach(state::putAll)
             if (!hasChanged)
                 break
 
@@ -88,7 +109,11 @@ abstract class QueryExecutor<T>(
         wholeMatchActions[name]?.invoke(match.filter { it.key.captureGroup().isPresent }
             .mapKeys { it.key.captureGroup().get() })
         return match.entries.asSequence()
-            .filter { it.key.captureGroup().isPresent && (captureGroupActions[name]?.containsKey(it.key.captureGroup().get()) ?: false) }
+            .filter {
+                it.key.captureGroup().isPresent && (captureGroupActions[name]?.containsKey(
+                    it.key.captureGroup().get()
+                ) ?: false)
+            }
             .flatMap { (queryVertex, nodes) ->
                 // queryVertex.captureGroup().get()
                 val ret = captureGroupActions[name]!![queryVertex.captureGroup().get()]!!.invoke(nodes)
