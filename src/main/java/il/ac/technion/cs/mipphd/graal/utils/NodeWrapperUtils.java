@@ -3,6 +3,7 @@ package il.ac.technion.cs.mipphd.graal.utils;
 import org.graalvm.compiler.nodes.ConstantNode;
 import org.graalvm.compiler.nodes.Invoke;
 import org.graalvm.compiler.nodes.LogicNode;
+import org.graalvm.compiler.nodes.ParameterNode;
 import org.jetbrains.annotations.NotNull;
 
 public class NodeWrapperUtils {
@@ -18,6 +19,10 @@ public class NodeWrapperUtils {
         return wrapper.node() instanceof LogicNode;
     }
 
+    public static boolean isParameter(WrappedIRNode wrapper) {
+        return wrapper.node() instanceof ParameterNode;
+    }
+
     @NotNull
     public static MethodWrapper getTargetMethod(@NotNull WrappedIRNode wrapper) {
         assert isInvoke(wrapper);
@@ -30,6 +35,13 @@ public class NodeWrapperUtils {
         assert isConstant(wrapper);
         ConstantNode constant = (ConstantNode) wrapper.node();
         return constant.getValue().toValueString();
+    }
+
+    @NotNull
+    public static int getParameterIndex(@NotNull WrappedIRNode wrapper) {
+        assert isParameter(wrapper);
+        ParameterNode parameter = (ParameterNode) wrapper.node();
+        return parameter.index();
     }
 
     @NotNull
