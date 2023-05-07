@@ -129,6 +129,10 @@ sealed class MetadataOption {
         override fun serialize() = "[]"
     }
 
+    object Optional : MetadataOption() {
+        override fun serialize() = "?"
+    }
+
     data class CaptureName(val name: String) : MetadataOption() {
         override fun serialize() = "(?P<$name>)"
     }
@@ -246,17 +250,18 @@ val mGrammar = object : Grammar<MQuery>() {
     val option: Parser<MetadataOption> by (
             kleeneStar asJust MetadataOption.Kleene) or (
             (-lpar * -question * id * -langle * id * -rangle * -rpar) map {
-                when (it.t1.text) {  
+                when (it.t1.text) {
                     "P" -> MetadataOption.CaptureName(it.t2.text)
                     else -> throw RuntimeException("Unexpected option character '${it.t1.text}'")
                 }
-            }) or (
-            (lbra * rbra) asJust MetadataOption.Repeated)
+            }) or
+            ((lbra * rbra) asJust MetadataOption.Repeated) or
+            (question asJust MetadataOption.Optional)
 
     val metadata: Parser<MQuery> by (
             oneOrMore(option) * -pipe * orChain map { Metadata(it.t2, it.t1) }) or // "*|is("Node")"
             (orChain map { Metadata(it) }) or // "is("Node")"
-            (oneOrMore(option) * -pipe map { Metadata(BooleanValue(true), it)}) // "*|"
+            (oneOrMore(option) * -pipe map { Metadata(BooleanValue(true), it) }) // "*|"
 
     override val rootParser by metadata
 }

@@ -38,6 +38,9 @@ public class GraphQueryEdge extends DefaultEdge {
         final Metadata m = (Metadata) this.getMQuery();
         if (m.getOptions().contains(MetadataOption.Kleene.INSTANCE))
             return GraphQueryEdgeMatchType.KLEENE;
+        else if (m.getOptions().contains(MetadataOption.Optional.INSTANCE)) {
+            return GraphQueryEdgeMatchType.OPTIONAL;
+        }
         return GraphQueryEdgeMatchType.NORMAL;
     }
 
