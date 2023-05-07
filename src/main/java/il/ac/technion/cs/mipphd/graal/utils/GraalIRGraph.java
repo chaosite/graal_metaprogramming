@@ -71,6 +71,7 @@ public class GraalIRGraph extends DirectedPseudograph<WrappedIRNodeImpl, Wrapped
                         } else if (position.getName().equals("values") && v instanceof FrameState) {
                             /* Do nothing in this case, these edges are polluting the graph and I don't think I need them */
                             /* TODO: Maybe do add them? As a special type of edge can perhaps ignore? */
+                            g.addEdge(new WrappedIRNodeImpl(u), new WrappedIRNodeImpl(v), new WrappedIREdge(WrappedIREdge.ASSOCIATED, position.getName()));
                         } else if (position.getName().equals("ends") && u instanceof EndNode) {
                             /* There already is a "next" edge, so we don't need this edge */
                         } else if ((position.getName().equals("stateAfter") && u instanceof FrameState) ||

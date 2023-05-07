@@ -44,6 +44,9 @@ fun makeLinexpr0(coeffs: Array<out Mpq>, cst: Mpq): Linexpr0 = Linexpr0(coeffs.s
 fun makeLincons0(coeffs: Array<out Mpq>, cst: Mpq, cons: Int): Lincons0 =
     Lincons0(cons, makeLinexpr0(coeffs, cst))
 
+fun makeLincons0(linexpr0: Linexpr0, cons: Int): Lincons0 =
+    Lincons0(cons, linexpr0)
+
 data class Monom(val name: String, val coeff: Mpq = 1.toMpq()) {
     constructor(name: String, coeff: Number) : this(name, coeff.toMpq())
 }
@@ -52,6 +55,11 @@ data class SymbolicLinExpr(
     val monoms: List<Monom> = listOf(),
     val constant: Mpq = 0.toMpq()
 ) {
+    companion object {
+        val NEGATIVE_ONE = SymbolicLinExpr(constant = (-1).toMpq())
+        val ZERO = SymbolicLinExpr(constant = 0.toMpq())
+        val ONE = SymbolicLinExpr(constant = 1.toMpq())
+    }
     constructor(c: Mpq, vararg ms: Monom) : this(ms.asList(), c)
     constructor(c: Number, vararg ms: Monom) : this(c.toMpq(), *ms)
 
@@ -81,9 +89,74 @@ data class SymbolicLinExpr(
         if (o.monoms.isNotEmpty())
             throw NotImplementedError() // TODO: Only handling linear cases, maybe do something better?
         return SymbolicLinExpr(monoms.map { Monom(it.name, it.coeff * o.constant) }, constant * o.constant)
-
     }
+
+    fun negate(): SymbolicLinExpr {
+        return SymbolicLinExpr(
+            monoms.map { Monom(it.name, it.coeff.clone().apply { neg() }) },
+            constant.clone().apply { neg() }
+        )
+    }
+
+    fun toShortString() = if (monoms.isEmpty() && constant == 0.toMpq()) "0" else
+        (monoms.map { "${it.coeff}*${it.name}" } + if (constant != 0.toMpq()) listOf("$constant") else listOf())
+            .joinToString(" + ")
 }
+
+enum class RelOp(val strReps: Collection<String>, val elinaRep: Int, val negate: Boolean = false) {
+    GT(">", Lincons0.SUP),
+    GE(">=", Lincons0.SUPEQ),
+    NE("!=", Lincons0.DISEQ),
+    EQ(listOf("=", "=="), Lincons0.EQ),
+    LT("<", Lincons0.SUP, true),
+    LE("<=", Lincons0.SUPEQ, true);
+
+    companion object {
+        private val REL_MAP: Map<String, RelOp>
+        val STRINGS: List<String> = RelOp.values().flatMap { it.strReps }
+
+        init {
+            val map = HashMap<String, RelOp>()
+            for (op in RelOp.values()) {
+                for (rep in op.strReps) {
+                    map[rep] = op
+                }
+            }
+            REL_MAP = map;
+        }
+
+        fun fromStrRep(rep: String): RelOp = REL_MAP[rep] ?: throw IllegalArgumentException()
+    }
+    constructor(strRep: String, elinaRep: Int, negate: Boolean = false) : this(listOf(strRep), elinaRep, negate)
+}
+
+data class SymbolicLinConstraint private constructor(
+    val expr: SymbolicLinExpr,
+    val rel: RelOp
+) {
+    companion object {
+        fun fromRelExpr(exprA: SymbolicLinExpr, rel: RelOp, exprB: SymbolicLinExpr): SymbolicLinConstraint =
+            SymbolicLinConstraint(exprA.plus(
+            if (rel.negate) exprB.negate() else exprB), rel)
+    }
+
+    fun toLincons0(state: ElinaAbstractState): Lincons0 {
+        val (o, linexpr0) = expr.toLinexpr0(state)
+        return makeLincons0(linexpr0, rel.elinaRep)
+    }
+
+    fun negated() = SymbolicLinConstraint(expr, when(rel) {
+        RelOp.GT -> RelOp.LE
+        RelOp.GE -> RelOp.LT
+        RelOp.EQ -> RelOp.NE
+        RelOp.NE -> RelOp.EQ
+        RelOp.LT -> RelOp.GE
+        RelOp.LE -> RelOp.GT
+    })
+
+    fun toShortString() = "${expr.toShortString()} ${rel.strReps.first()} 0"
+}
+
 
 abstract class ElinaAbstractState(
     private val man: Manager,
@@ -277,7 +350,7 @@ abstract class ElinaAbstractState(
         val (_, dim) = varToDim(name)
 
         val interval = abstract.getBound(man, dim)
-        println(interval)
+        // println(interval)
         return interval.run { inf.toMpq() to sup.toMpq() }
     }
 
@@ -300,10 +373,6 @@ abstract class ElinaAbstractState(
     fun isDeclared(name: String): Boolean = name in vars
 
     fun varIndex(varName: String) = vars.indexOf(varName)
-
-    fun contains() {
-
-    }
 
     override fun toString() = when {
         isTop() -> "${this.javaClass.simpleName}.top()"

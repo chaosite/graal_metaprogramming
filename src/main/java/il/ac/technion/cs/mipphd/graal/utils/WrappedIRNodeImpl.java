@@ -5,6 +5,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodeinfo.Verbosity;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -82,5 +83,11 @@ public class WrappedIRNodeImpl implements WrappedIRNode {
 
     public String getId() {
         return this.node.toString(Verbosity.Id);
+    }
+
+    @NotNull
+    @Override
+    public String getType() {
+        return this.node.toString(Verbosity.Name);
     }
 }

@@ -15,13 +15,18 @@ val predefined = createMap(
     functionVariable("is", MFunction(listOf(MString), MBoolean)) { p, t ->
         val cmp = (p[0] as StringValue).value
         when (t) {
-            is QueryTargetNode -> BooleanValue(t.node.let { if (it is AnalysisNode.IR) it.isType(cmp) else false })
-            is QueryTargetEdge -> BooleanValue(when(cmp) {
-                WrappedIREdge.DATA -> t.edge is AnalysisEdge.Data
-                WrappedIREdge.CONTROL -> t.edge is AnalysisEdge.Control
-                WrappedIREdge.ASSOCIATED -> t.edge is AnalysisEdge.Association
-                else -> false // TODO: Add custom kinds
-            })
+            is QueryTargetNode -> BooleanValue(t.node.isType(cmp))
+            is QueryTargetEdge -> BooleanValue(
+                t.edge.let {
+                    when (it) {
+                        is AnalysisEdge.Data -> cmp == WrappedIREdge.DATA
+                        is AnalysisEdge.Control -> cmp == WrappedIREdge.CONTROL
+                        is AnalysisEdge.Association -> cmp == WrappedIREdge.ASSOCIATED
+                        is AnalysisEdge.Extra -> cmp == it.javaClass.simpleName// TODO: Use reflection?
+                        is AnalysisEdge.Default -> false
+                    }
+                }
+            )
         }
     },
     functionVariable(
@@ -42,7 +47,9 @@ val predefined = createMap(
             } else {
                 throw RuntimeException("Applied `method` to $node which is not an IR node")
             }
-        } else { throw RuntimeException("Not a node")}
+        } else {
+            throw RuntimeException("Not a node")
+        }
     },
     functionVariable("name", MFunction(listOf(), MString)) { _, t ->
         when (t) {

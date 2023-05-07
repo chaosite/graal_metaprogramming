@@ -229,11 +229,9 @@ class GenericObjectWithField(val obj: AnalysisNode.IR?, val field: String) : Ana
         return result
     }
 
-    override fun toString(): String {
-        return "($obj, $field)"
-    }
+    override fun description() = "$obj, $field"
 
-    fun isType(className: String?): Boolean {
+    override fun isType(className: String): Boolean {
         return className == "GenericObjectWithField"
     }
 }

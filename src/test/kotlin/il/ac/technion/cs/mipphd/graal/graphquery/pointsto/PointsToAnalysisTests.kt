@@ -61,12 +61,12 @@ fun anyHolder2(param: String?): AnyHolder {
 
 fun anyHolder3(param: String?): AnyHolder {
     val first = AnyHolder() // 85
-    anyUser(first)
+//    anyUser(first)
     first.any = param ?: ""
     first.other = null
 
     val second = AnyHolder() // 89
-    anyUser(second)
+//    anyUser(second)
 //    second.any = null
 //    second.other = null
 //    if (param != null && param.length > 2) {
@@ -75,7 +75,7 @@ fun anyHolder3(param: String?): AnyHolder {
 //    } // to try next: separate if to two ifs with same condition
 
     val third = AnyHolder() // 93
-    anyUser(third)
+//    anyUser(third)
     third.any = second
     third.other = null
     return third
@@ -234,6 +234,12 @@ class PointsToAnalysisTests {
         assert(graph.vertexSet().filterIsInstance<AnalysisNode.IR>().filter { it.isType("AllocatedObjectNode") }.size == 3)
     }
 
+    @Test
+    fun `print addToBst`() {
+        val m = MethodToGraph(false)
+        val g = m.getAnalysisGraph(::anyHolder3.javaMethod)
+        println(g.export())
+    }
 
     @Test
     fun `get pointsto graph of addToBst`() {

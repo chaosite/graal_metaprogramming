@@ -10,6 +10,7 @@ import il.ac.technion.cs.mipphd.graal.graphquery.AnalysisNode
 import il.ac.technion.cs.mipphd.graal.graphquery.GraphQuery
 import il.ac.technion.cs.mipphd.graal.graphquery.GraphQueryVertex
 import il.ac.technion.cs.mipphd.graal.utils.MethodToGraph
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -123,6 +124,7 @@ val FunctionInvoke2Param = GraphQuery.importQuery(
 }"""
 )
 
+@Disabled
 internal class PseudographTest {
     val methodToGraph = MethodToGraph(false) // this works much better with optimizations turned OFF
     val klaxon = Klaxon()

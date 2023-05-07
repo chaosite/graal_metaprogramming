@@ -2,6 +2,7 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNode
 import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl
+import java.util.*
 
 /**
  * Node in the analysis graph.
@@ -11,7 +12,10 @@ sealed class AnalysisNode private constructor() {
     /**
      * Default node, should not be present in an actual analysis graph.
      */
-    object Default : AnalysisNode()
+    object Default : AnalysisNode() {
+        override fun description() = "default"
+        override fun isType(name: String) = false
+    }
 
     /**
      * Node from the Graal IR CFG
@@ -31,13 +35,14 @@ sealed class AnalysisNode private constructor() {
             return wrappedNode.hashCode()
         }
 
-        override val index: Int
-            get() = id.toInt()
+        override val index: UInt
+            get() = id.toUInt()
 
         override val nodeName: String
             get() = "ir${index}"
 
-        override fun toString() = "${this.javaClass.simpleName}(${wrappedNode.shortToString()})"
+        override fun description(): String = wrappedNode.shortToString()
+
 
         val isMerge: Boolean
             get() = wrappedNode.isType("MergeNode")
@@ -49,22 +54,47 @@ sealed class AnalysisNode private constructor() {
             get() = !isControl
         val isReturn: Boolean
             get() = wrappedNode.isType("ReturnNode")
+        val isParameter: Boolean
+            get() = wrappedNode.isType("ParameterNode")
     }
 
     /**
      * Node added to the graph by an analysis
      */
-    abstract class Specific : AnalysisNode()
+    abstract class Specific : AnalysisNode() {
+        companion object {
+            protected var indexNameCounter = 0U
+        }
 
-    open val index: Int
-        get() = hashCode()
+        protected val indexValue: UInt
+
+        init {
+            indexValue = indexNameCounter
+            indexNameCounter++
+        }
+
+        override val index: UInt
+            get() = indexValue
+
+        private val className = this.javaClass.simpleName
+
+        override fun isType(name: String) = name == className // TODO: Do something fancier with inheritance?
+
+    }
+
+    open val index: UInt
+        get() = hashCode().toUInt()
 
     /**
      * Name of the node, for use when exporting in GraphViz format.
      */
     open val nodeName: String
-        get() = "${this.javaClass.simpleName}${index}"
+        get() = "${this.javaClass.simpleName}$index"
 
-    override fun toString() = "${this.javaClass.simpleName}{..}"
+    override fun toString() = "${this.javaClass.simpleName}{${description()}}"
+
+    abstract fun description(): String
+
+    abstract fun isType(name: String): Boolean
 }
 
