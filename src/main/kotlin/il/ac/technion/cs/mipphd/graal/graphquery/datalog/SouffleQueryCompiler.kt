@@ -11,7 +11,8 @@ class SouffleException(msg: String, cause: Throwable? = null) : Exception(msg, c
 
 class CompiledSouffleQuery(
     private val workDir: Path, private val binaryQuery: Path,
-    private val inputs: MutableMap<Path, (AnalysisGraph) -> StringBuilder>
+    private val inputs: MutableMap<Path, (AnalysisGraph) -> StringBuilder>,
+    private val parsers: MutableList<Pair<GraphQuery, (AnalysisGraph) -> QueryResults>>
 ) : CompiledQuery {
     override fun execute(graph: AnalysisGraph): Map<GraphQuery, QueryResults> {
         for (input in inputs) {
@@ -44,8 +45,8 @@ class CompiledSouffleQuery(
         }
 
         println(Files.list(workDir).toList())
-        // TODO: Read the "q?_main.csv" files and get the outputs
-        return mapOf()
+
+        return parsers.associate { it.first to it.second(graph) }
     }
 }
 
@@ -59,6 +60,7 @@ class SouffleQueryCompiler(
 
         private const val AUTOINC = "autoinc()"
     }
+
     override fun compile(queries: List<GraphQuery>): CompiledQuery {
         val state = State(this)
 
@@ -84,13 +86,14 @@ class SouffleQueryCompiler(
         // Done preparing the Datalog files, execute the compiler
         val binaryPath = executeSouffle(state)
 
-        return CompiledSouffleQuery(workDir, binaryPath, state.inputs)
+        return CompiledSouffleQuery(workDir, binaryPath, state.inputs, state.outputs)
     }
 
     private data class State(
         val that: SouffleQueryCompiler,
         val buffer: MutableList<String> = mutableListOf(),
         val inputs: MutableMap<Path, (AnalysisGraph) -> StringBuilder> = mutableMapOf(),
+        val outputs: MutableList<Pair<GraphQuery, (AnalysisGraph) -> QueryResults>> = mutableListOf(),
         var numOfQueries: Int = 0
     ) {
 
@@ -105,6 +108,7 @@ class SouffleQueryCompiler(
         fun emitDecl(relation: String, params: List<Pair<String, String>>) {
             buffer += ".decl ${relation}(${params.joinToString(", ") { "${it.first}: ${it.second}" }})"
         }
+
         fun emitRelation(relation: SouffleRelation) {
             buffer += relation.toString()
         }
@@ -112,7 +116,9 @@ class SouffleQueryCompiler(
 
     private data class QueryState(
         val id: Int,
-        val captureGroups: MutableMap<String, GraphQueryVertex> = mutableMapOf()
+        val captureGroups: MutableMap<String, GraphQueryVertex> = mutableMapOf(),
+        val vertices: MutableMap<String, GraphQueryVertex> = mutableMapOf()
+
     )
 
     private fun executeSouffle(state: State): Path {
@@ -195,6 +201,8 @@ class SouffleQueryCompiler(
             if (mQuery.options.any { it is MetadataOption.CaptureName }) {
                 val captureGroup = mQuery.options.filterIsInstance<MetadataOption.CaptureName>().first().name
                 queryState.captureGroups[captureGroup] = node
+            } else {
+                queryState.vertices[node.name] = node
             }
         }
     }
@@ -219,16 +227,29 @@ class SouffleQueryCompiler(
     private fun compileQueryMain(state: State, queryState: QueryState, query: GraphQuery) {
         state.emitDecl(
             mainRelationName(queryState),
-            listOf("?idx" to NUMBER_TYPE) + queryState.captureGroups.map { "?${it.key}" to NUMBER_TYPE })
+            listOf("?idx" to NUMBER_TYPE) +
+                    queryState.captureGroups.map { "?${it.key}" to NUMBER_TYPE } +
+                    queryState.vertices.map { "?${it.key}" to NUMBER_TYPE })
         state.emitOutputDecl(mainRelationName(queryState))
 
-        val reverseCaptureGroup = queryState.captureGroups.map { it.value to it.key }.toMap()
+        val reverseCaptureGroup = (queryState.captureGroups.map { it.value to it.key }
+                + queryState.vertices.map { it.value to it.key }).toMap()
         val vars = hashMapOf<GraphQueryVertex, String>()
+
+        val outputParser = SouffleOutputParser(relationToPath(mainRelationName(queryState)))
+
+        for ((name, vertex) in queryState.captureGroups)
+            outputParser.addCaptureGroup(name, vertex)
+        for (vertex in queryState.vertices.values)
+            outputParser.addVertex(vertex)
+        state.outputs.add(query to outputParser::parse)
 
         state.emitRelation(
             souffle(
                 mainRelationName(queryState),
-                listOf(AUTOINC) + queryState.captureGroups.keys.map { "?$it" }) {
+                listOf(AUTOINC) +
+                        queryState.captureGroups.keys.map { "?$it" } +
+                        queryState.vertices.keys.map { "?$it" }) {
                 for (node in query.vertexSet()) {
                     val varName = if (node in reverseCaptureGroup) "?${reverseCaptureGroup[node]}" else node.name
                     vars[node] = varName
@@ -247,6 +268,10 @@ class SouffleQueryCompiler(
                         param("_")
                         param("_")
                     }
+                    relation(edgeRelationName(queryState, src.name, dst.name)) {
+                        param(vars[src]!!)
+                        param(vars[dst]!!)
+                    }
                 }
             }
         )
@@ -257,7 +282,14 @@ class SouffleQueryCompiler(
 
     private fun serializeGraphEdges(graph: AnalysisGraph): StringBuilder =
         serializeRelation(
-            graph.edgeSet().map { listOf(graph.getEdgeSource(it).index.toInt(), graph.getEdgeTarget(it).index.toInt()) }
+            graph.edgeSet().map {
+                listOf(
+                    /* src */ graph.getEdgeSource(it).index.toInt(),
+                    /* dst */ graph.getEdgeTarget(it).index.toInt(),
+                    /* type */ it.baseType(),
+                    /* label */ it.label
+                )
+            }
                 .iterator()
         )
 

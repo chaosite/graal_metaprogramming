@@ -53,3 +53,11 @@ sealed class AnalysisEdge private constructor(val label: String) : DefaultEdge()
     // This is redundant, but making it explicit
     override fun hashCode() = super.hashCode()
 }
+
+fun AnalysisEdge.baseType(): String = when (this) {
+    is AnalysisEdge.Data -> "data"
+    is AnalysisEdge.Association -> "association"
+    is AnalysisEdge.Control -> "control"
+    is AnalysisEdge.Default -> "default"
+    is AnalysisEdge.Extra -> "other"
+}

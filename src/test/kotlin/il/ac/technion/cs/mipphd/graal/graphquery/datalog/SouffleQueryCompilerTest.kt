@@ -132,22 +132,44 @@ class SouffleQueryCompilerTest {
         @Nested
         @DisplayName("Execution")
         inner class ExecutionTests {
+            private val graph = methodToGraph.getAnalysisGraph(::mccarthy91.javaMethod)
+
             @Test
             fun `execute trivial query`() {
                 val query = compiler.compile(listOf(trivialQuery))
 
-                val graph = methodToGraph.getAnalysisGraph(::mccarthy91.javaMethod)
+                val results = query.execute(graph)
 
-                query.execute(graph)
+                assertEquals(results.size, 1)
+                assertTrue(results.containsKey(trivialQuery))
+                assertEquals(results[trivialQuery]?.size, 1)
+                assertEquals(results[trivialQuery]?.first()?.size, 1)
+                assertEquals(results[trivialQuery]?.first()?.values?.first()?.size, 1)
+                assertEquals(results[trivialQuery]?.first()?.values?.first()?.first()?.isType("StartNode"), true)
             }
 
             @Test
             fun `execute simple query`() {
                 val query = compiler.compile(listOf(simpleQuery))
 
-                val graph = methodToGraph.getAnalysisGraph(::mccarthy91.javaMethod)
+                val results = query.execute(graph)
 
-                query.execute(graph)
+                assertEquals(results.size, 1)
+                assertTrue(results.containsKey(simpleQuery))
+
+                val x = simpleQuery.vertexSet().find { it.name == "x" }!!
+                val y = simpleQuery.vertexSet().find { it.name == "y" }!!
+                val arith = simpleQuery.vertexSet().find { it.name == "arith" }!!
+
+                for (map in results[simpleQuery]!!) {
+                    assertEquals(map[x]?.size, 1)
+                    assertEquals(map[y]?.size, 1)
+                    assertEquals(map[arith]?.size, 1)
+
+                    map[x]?.forEach { assertTrue(x.match(it)) }
+                    map[y]?.forEach { assertTrue(y.match(it)) }
+                    map[arith]?.forEach { assertTrue(arith.match(it)) }
+                }
             }
         }
     }

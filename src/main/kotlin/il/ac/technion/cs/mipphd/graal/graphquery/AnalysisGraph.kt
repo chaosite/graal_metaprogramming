@@ -217,4 +217,7 @@ open class AnalysisGraph :
         assert(vertexSet().find { it is AnalysisNode.IR && it.isStart } != null)
         assert(vertexSet().find { it is AnalysisNode.IR && it.isReturn } != null)
     }
+
+    // TODO: Add a mapping?
+    fun findNode(index: UInt) : AnalysisNode? = vertexSet().find { it.index == index }
 }
