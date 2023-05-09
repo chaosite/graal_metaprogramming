@@ -26,9 +26,7 @@ sealed class AnalysisNode private constructor() {
 
             other as IR
 
-            if (wrappedNode != other.wrappedNode) return false
-
-            return true
+            return wrappedNode == other.wrappedNode
         }
 
         override fun hashCode(): Int {
@@ -66,12 +64,7 @@ sealed class AnalysisNode private constructor() {
             protected var indexNameCounter = 0U
         }
 
-        protected val indexValue: UInt
-
-        init {
-            indexValue = indexNameCounter
-            indexNameCounter++
-        }
+        private val indexValue: UInt = indexNameCounter++
 
         override val index: UInt
             get() = indexValue
