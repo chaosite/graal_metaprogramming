@@ -29,40 +29,41 @@ public class GraphQuery extends DirectedPseudograph<GraphQueryVertex, GraphQuery
     }
 
     /* TODO: Move match methods somewhere else, now that it might not be with BFS */
+    @NonNull
     protected Stream<Map<GraphQueryVertex, List<AnalysisNode>>> _match(AnalysisGraph cfg) {
         return GenericBFSKt.bfsMatch(this, cfg, this.startCandidate(cfg)).stream();
     }
 
-    public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(GraalIRGraph cfg) {
+    @NonNull
+    public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(@NonNull GraalIRGraph cfg) {
         return match(AnalysisGraph.Companion.fromIR(cfg));
     }
 
-    public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(AnalysisGraph graph) {
+    @NonNull
+    public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(@NonNull AnalysisGraph graph) {
         return _match(graph).toList();
     }
 
-
-    public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(ControlFlowGraph cfg) {
+    @NonNull
+    public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(@NonNull ControlFlowGraph cfg) {
         return match(GraalIRGraph.fromGraal(cfg));
     }
 
-    public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(CFGWrapper cfg) {
+    @NonNull
+    public List<Map<GraphQueryVertex, List<AnalysisNode>>> match(@NonNull CFGWrapper cfg) {
         return match(cfg.asCFG());
     }
 
-    public GraphQueryVertex addVertex(String mQuery) {
-        final GraphQueryVertex v = GraphQueryVertex.fromQuery(mQuery);
-        this.addVertex(v);
-        return v;
+    @NonNull
+    public Collection<GraphQueryVertex> connectedVerticesOf(@NonNull GraphQueryVertex v) {
+        Set<GraphQueryVertex> ret = new HashSet<>(degreeOf(v));
+        ret.addAll(incomingEdgesOf(v).stream().map(this::getEdgeSource).toList());
+        ret.addAll(outgoingEdgesOf(v).stream().map(this::getEdgeTarget).toList());
+        return ret.stream().toList();
     }
 
-    public GraphQueryEdge addEdge(GraphQueryVertex source, GraphQueryVertex destination, GraphQueryEdgeType type, GraphQueryEdgeMatchType matchType) {
-        final GraphQueryEdge e = new GraphQueryEdge(type, matchType);
-        this.addEdge(source, destination, e);
-        return e;
-    }
-
-    private @NonNull  GraphQueryVertex startCandidate(@NonNull AnalysisGraph cfg) {
+    @NonNull
+    private GraphQueryVertex startCandidate(@NonNull AnalysisGraph cfg) {
         final Set<AnalysisNode> nodes = new HashSet<>(cfg.vertexSet());
         Optional<GraphQueryVertex> root = this.vertexSet().stream()
                 .filter(v -> !((Metadata) v.getMQuery()).getOptions().contains(MetadataOption.Repeated.INSTANCE) )

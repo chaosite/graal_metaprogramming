@@ -60,6 +60,20 @@ digraph G {
 }
 """.trimIndent())
 
+val doubleSunQuery = GraphQuery.importQuery("""
+digraph G {
+	framestate [ label="is('FrameState')" ];
+	merge [ label="(?P<mergenode>)|is('AbstractMergeNode')" ];
+	values [ label="[](?P<phivalues>)|" ];
+    sourcevalues [ label="[](?P<phisourcevalues>)|" ];
+
+	values -> framestate [ label = "is('ASSOCIATED') and name() = 'values'" ];
+    merge -> values [ label = "name() = 'merge'" ];
+    sourcevalues -> values [ label = "name() != 'merge'" ];
+	framestate -> merge [ label = "is('ASSOCIATED') and name() = 'stateAfter'" ];
+}
+""".trimIndent())
+
 class SouffleQueryCompilerTest {
     private lateinit var compiler: SouffleQueryCompiler
     private lateinit var workDir: Path
@@ -120,8 +134,17 @@ class SouffleQueryCompilerTest {
             }
 
             @Test
+            fun `compile double sun query and verify outputs exist`() {
+                compiler.compile(listOf(doubleSunQuery))
+
+                assertTrue(workDir.resolve("script.dl").isRegularFile())
+                assertTrue(workDir.resolve("script.cpp").isRegularFile())
+                assertTrue(workDir.resolve("script").isExecutable())
+            }
+
+            @Test
             fun `compile multiple queries and verify outputs exist`() {
-                compiler.compile(listOf(trivialQuery, simpleQuery, kleeneQuery, sunQuery))
+                compiler.compile(listOf(trivialQuery, simpleQuery, kleeneQuery, sunQuery, doubleSunQuery))
 
                 assertTrue(workDir.resolve("script.dl").isRegularFile())
                 assertTrue(workDir.resolve("script.cpp").isRegularFile())
@@ -170,6 +193,21 @@ class SouffleQueryCompilerTest {
                     map[y]?.forEach { assertTrue(y.match(it)) }
                     map[arith]?.forEach { assertTrue(arith.match(it)) }
                 }
+            }
+
+            @Test
+            fun `execute sun query`() {
+                val query = compiler.compile(listOf(sunQuery))
+
+                val results = query.execute(graph)
+            }
+
+            @Test
+            fun `execute double sun query`() {
+                val query = compiler.compile(listOf(doubleSunQuery))
+
+                val results = query.execute(graph)
+                println(results)
             }
         }
     }
