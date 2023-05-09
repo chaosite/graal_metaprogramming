@@ -2,7 +2,6 @@ package il.ac.technion.cs.mipphd.graal.graphquery
 
 import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNode
 import il.ac.technion.cs.mipphd.graal.utils.WrappedIRNodeImpl
-import java.util.*
 
 /**
  * Node in the analysis graph.
