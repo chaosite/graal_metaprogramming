@@ -50,7 +50,9 @@ class SouffleRelation(val name: String, val params: List<String>) : SouffleClaus
         builder.append(name)
         builder.append('(')
         builder.append(params.joinToString(separator = ", "))
-        builder.append(") :-\n")
+        builder.append(")")
+        if (children.isNotEmpty())
+            builder.append(" :-\n")
         super.render(builder, indent)
         builder.append(".")
     }

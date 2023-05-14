@@ -41,7 +41,7 @@ class CompiledSouffleQuery(
         if (p.exitValue() != 0) {
             throw SouffleException(
                 "Datalog script subprocess exited with code ${p.exitValue()}, stderr is: \"${
-                    p.errorReader().readLine()
+                    p.errorReader().readText()
                 }\""
             )
         }
@@ -59,12 +59,21 @@ class SouffleQueryCompiler(
     companion object {
         private const val NUMBER_TYPE = "number"
         private const val SYMBOL_TYPE = "symbol"
+        private const val NODE_TYPE = "Vertex"
+        private const val LIST_TYPE = "NodeList"
+
+        private const val LIST_DATA = "n"
+        private const val LIST_NEXT = "next"
 
         private const val AUTOINC = "autoinc()"
         private const val WILD = "_"
+        private const val NIL = "nil"
 
         private const val IDX_PARAM = "?idx"
         private const val REF_PARAM = "?ref"
+        private const val SRC_PARAM = "?src"
+        private const val PATH_PARAM = "?path"
+        private const val LAST_PARAM = "?last"
 
         private const val NODE_RELATION = "Node"
         private const val EDGE_RELATION = "Edge"
@@ -73,15 +82,19 @@ class SouffleQueryCompiler(
     override fun compile(queries: List<GraphQuery>): CompiledQuery {
         val state = State(this)
 
+        // Header: Types definitions
+        state.emit(".type $LIST_TYPE = [ $LIST_DATA: $NODE_TYPE, $LIST_NEXT: $LIST_TYPE ]")
+        state.emit(".type $NODE_TYPE <: number")
+
         // Header: Nodes definitions
-        state.emitDecl(NODE_RELATION, listOf("id" to NUMBER_TYPE, "label" to SYMBOL_TYPE))
+        state.emitDecl(NODE_RELATION, listOf("id" to NODE_TYPE, "label" to SYMBOL_TYPE))
         state.emitInputDecl(NODE_RELATION)
         state.inputs[relationToPath(NODE_RELATION)] = ::serializeGraphNodes
 
         // Header: Edges definitions
         state.emitDecl(
             EDGE_RELATION,
-            listOf("src" to NUMBER_TYPE, "dst" to NUMBER_TYPE, "type" to SYMBOL_TYPE, "label" to SYMBOL_TYPE)
+            listOf("src" to NODE_TYPE, "dst" to NODE_TYPE, "type" to SYMBOL_TYPE, "label" to SYMBOL_TYPE)
         )
         state.emitInputDecl(EDGE_RELATION)
         state.inputs[relationToPath(EDGE_RELATION)] = ::serializeGraphEdges
@@ -106,19 +119,23 @@ class SouffleQueryCompiler(
     ) {
 
         fun emitInputDecl(relation: String) {
-            buffer += ".input ${relation}(IO=file, filename=\"${that.relationToPath(relation).fileName}\")"
+            emit(".input ${relation}(IO=file, filename=\"${that.relationToPath(relation).fileName}\")")
         }
 
         fun emitOutputDecl(relation: String) {
-            buffer += ".output ${relation}(IO=file, filename=\"${that.relationToPath(relation).fileName}\")"
+            emit(".output ${relation}(IO=file, filename=\"${that.relationToPath(relation).fileName}\")")
         }
 
         fun emitDecl(relation: String, params: List<Pair<String, String>>) {
-            buffer += ".decl ${relation}(${params.joinToString(", ") { "${it.first}: ${it.second}" }})"
+            emit(".decl ${relation}(${params.joinToString(", ") { "${it.first}: ${it.second}" }})")
         }
 
         fun emitRelation(relation: SouffleRelation) {
-            buffer += relation.toString()
+            emit(relation.toString())
+        }
+
+        fun emit(raw: String) {
+            buffer += raw
         }
     }
 
@@ -128,7 +145,7 @@ class SouffleQueryCompiler(
         val reverseCaptureGroups: MutableMap<GraphQueryVertex, String> = mutableMapOf(),
         val vertices: MutableMap<String, GraphQueryVertex> = mutableMapOf(),
         val repeatedVertices: MutableMap<String, GraphQueryVertex> = mutableMapOf(),
-        val orderedKleeneVertices: MutableList<GraphQueryVertex> = mutableListOf(),
+        val orderedRepeatedVertices: MutableList<GraphQueryVertex> = mutableListOf(),
         val kleeneVertices: MutableMap<String, GraphQueryVertex> = mutableMapOf(),
         val repeatedParsers: MutableList<SouffleOutputParser> = mutableListOf()
     )
@@ -148,7 +165,7 @@ class SouffleQueryCompiler(
         val p = try {
             ProcessBuilder(*cmdline)
                 .directory(workDir.toFile())
-                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .redirectError(ProcessBuilder.Redirect.PIPE)
                 .redirectOutput(ProcessBuilder.Redirect.INHERIT)
                 .start()
         } catch (e: Exception) {
@@ -195,11 +212,15 @@ class SouffleQueryCompiler(
     private fun nodeRelationName(queryState: QueryState, nodeName: String) =
         relationName(queryState, "n", nodeName)
 
+    // TODO: This currently does not support parallel edges between vertices *in the query*.
     private fun edgeRelationName(queryState: QueryState, src: String, dst: String) =
         relationName(queryState, "e", "${src}_${dst}")
 
     private fun repeatedRelationName(queryState: QueryState, nodeName: String) =
         relationName(queryState, "r", nodeName)
+
+    private fun kleeneRelationName(queryState: QueryState, nodeName: String) =
+        relationName(queryState, "k", nodeName)
 
     private fun mainRelationName(queryState: QueryState) =
         "q${queryState.id}_main"
@@ -207,7 +228,7 @@ class SouffleQueryCompiler(
     private fun compileQueryNodes(state: State, queryState: QueryState, query: GraphQuery) {
         /* inline */ fun relName(nodeName: String) = nodeRelationName(queryState, nodeName)
         for (node in query.vertexSet()) {
-            state.emitDecl(relName(node.name), listOf("id" to NUMBER_TYPE))
+            state.emitDecl(relName(node.name), listOf("id" to NODE_TYPE))
             state.emitInputDecl(relName(node.name))
             val mQuery = node.mQuery as Metadata
             state.inputs[relationToPath(relName(node.name))] = { graph ->
@@ -222,7 +243,7 @@ class SouffleQueryCompiler(
             } else {
                 queryState.vertices[node.name] = node
             }
-            if (query.isSunVertex(node)) {
+            if (query.isRepeatedVertex(node)) {
                 queryState.repeatedVertices[node.name] = node
                 // TODO: Add checks for Sun vertices
             }
@@ -232,7 +253,7 @@ class SouffleQueryCompiler(
             }
         }
 
-        queryState.orderedKleeneVertices.addAll(
+        queryState.orderedRepeatedVertices.addAll(
             queryState.repeatedVertices.values.sortedWith(
                 compareBy({ -query.edgesOf(it).size }, { it })
             )
@@ -248,7 +269,8 @@ class SouffleQueryCompiler(
             query.getEdgeTarget(edge).name
         )
         for (edge in query.edgeSet()) {
-            state.emitDecl(relName(edge), listOf("src" to NUMBER_TYPE, "dst" to NUMBER_TYPE))
+            // Doesn't really support multiple edges between the same 2 nodes...
+            state.emitDecl(relName(edge), listOf("src" to NODE_TYPE, "dst" to NODE_TYPE))
             state.emitInputDecl(relName(edge))
             val mQuery = edge.mQuery as Metadata
             state.inputs[relationToPath(relName(edge))] = { graph ->
@@ -262,6 +284,13 @@ class SouffleQueryCompiler(
     private fun nodeToParamName(queryState: QueryState, node: GraphQueryVertex) =
         "?${if (node in queryState.reverseCaptureGroups) queryState.reverseCaptureGroups[node] else node.name}"
 
+    private fun nodeToParamType(query: GraphQuery, node: GraphQueryVertex): String =
+        when {
+            query.isKleeneVertex(node) -> LIST_TYPE
+            query.isRepeatedVertex(node) -> assert(false) {"Shouldn't happen: $node"}.let { "" }
+            else -> NODE_TYPE
+        }
+
     private fun mainRelationParameters(
         state: State,
         queryState: QueryState,
@@ -269,39 +298,39 @@ class SouffleQueryCompiler(
     ): NavigableMap<GraphQueryVertex, String> {
         val ret = TreeMap<GraphQueryVertex, String>()
 
-        for (node in query.vertexSet().filterNot(query::isSunVertex))
+        for (node in query.vertexSet().asSequence().filterNot(query::isRepeatedVertex))
             ret[node] = nodeToParamName(queryState, node)
 
         return ret
     }
 
     private fun compileQueryRepeated(state: State, queryState: QueryState, query: GraphQuery) {
-        for (node in queryState.orderedKleeneVertices) {
+        for (node in queryState.orderedRepeatedVertices) {
             state.emitDecl(
                 repeatedRelationName(queryState, node.name),
                 listOf(
                     IDX_PARAM to NUMBER_TYPE,
                     REF_PARAM to NUMBER_TYPE,
-                    nodeToParamName(queryState, node) to NUMBER_TYPE
+                    nodeToParamName(queryState, node) to NODE_TYPE
                 )
             )
             state.emitOutputDecl(repeatedRelationName(queryState, node.name))
         }
 
-        val parsers = queryState.orderedKleeneVertices.associateWith {
+        val parsers = queryState.orderedRepeatedVertices.associateWith {
             SouffleOutputParser(relationToPath(repeatedRelationName(queryState, it.name)))
         }
 
-        for ((nodeIndex, node) in queryState.orderedKleeneVertices.withIndex()) {
+        for ((nodeIndex, node) in queryState.orderedRepeatedVertices.withIndex()) {
             // Assumption: There is exactly 1 foreign key (is this just souffle or in general?)
-            if (query.connectedVerticesOf(node).filter(query::isSunVertex).filterNot { it == node }.count() > 1)
+            if (query.connectedVerticesOf(node).filter(query::isRepeatedVertex).filterNot { it == node }.count() > 1)
                 throw SouffleException("Broken assumption: ${node.name} is connected to more than one repeated vertex")
 
             val otherIndex =
                 query.connectedVerticesOf(node)
-                    .filter(query::isSunVertex)
-                    .minOfOrNull(queryState.orderedKleeneVertices::indexOf) ?: nodeIndex
-            val otherNode = if (nodeIndex <= otherIndex) null else queryState.orderedKleeneVertices[otherIndex]
+                    .filter(query::isRepeatedVertex)
+                    .minOfOrNull(queryState.orderedRepeatedVertices::indexOf) ?: nodeIndex
+            val otherNode = if (nodeIndex <= otherIndex) null else queryState.orderedRepeatedVertices[otherIndex]
             val valueParam = nodeToParamName(queryState, node)
 
             parsers[node]!!.addForeignReference()
@@ -347,7 +376,7 @@ class SouffleQueryCompiler(
                     nodeRelation(nodeToParamName(queryState, node), nodeRelationName(queryState, node.name))
                     for (e in query.incomingEdgesOf(node)) {
                         val v = query.getEdgeSource(e)
-                        if (queryState.orderedKleeneVertices.indexOf(v) > nodeIndex)
+                        if (queryState.orderedRepeatedVertices.indexOf(v) > nodeIndex)
                             continue
                         assert(v in vars)
                         edgeRelation(
@@ -358,7 +387,7 @@ class SouffleQueryCompiler(
                     }
                     for (e in query.outgoingEdgesOf(node)) {
                         val v = query.getEdgeTarget(e)
-                        if (queryState.orderedKleeneVertices.indexOf(v) > nodeIndex)
+                        if (queryState.orderedRepeatedVertices.indexOf(v) > nodeIndex)
                             continue
                         assert(v in vars)
                         edgeRelation(
@@ -369,16 +398,46 @@ class SouffleQueryCompiler(
                     }
                 }
             )
-
-
         }
+    }
+
+    private fun compileKleeneNode(state: State, queryState: QueryState, query: GraphQuery, src: GraphQueryVertex, node: GraphQueryVertex) {
+        val HD1_PARAM = "?x"
+        val TL_PARAM = "?xs"
+        val r = kleeneRelationName(queryState, node.name)
+        state.emitDecl(r, listOf(SRC_PARAM to NODE_TYPE, PATH_PARAM to LIST_TYPE, LAST_PARAM to NODE_TYPE))
+
+        // we *should not* output these, maybe souffle can not compute the whole relation this way
+        //state.emitOutputDecl(r)
+
+        // First case: path of length == 0
+        // I *want* to have just "kleene(?src, nil, ?src)." but souffle won't have it because that means ?src is
+        // ungrounded :(
+        state.emitRelation(souffle(r, listOf(SRC_PARAM, NIL, SRC_PARAM)) {
+            // Just make sure it's a node, I guess...
+            relation(NODE_RELATION) {
+                param(SRC_PARAM)
+                param(WILD)
+            }
+        })
+        // Second case: path of length >= 1
+        state.emitRelation(souffle(r, listOf(SRC_PARAM, "[$HD1_PARAM, $TL_PARAM]", LAST_PARAM)) {
+            edgeRelation(SRC_PARAM, HD1_PARAM, edgeRelationName(queryState, src.name, node.name))
+            nodeRelation(HD1_PARAM, nodeRelationName(queryState, node.name))
+            relation(r) {
+                param(HD1_PARAM)
+                param(TL_PARAM)
+                param(LAST_PARAM)
+            }
+        })
     }
 
     private fun compileQueryMain(state: State, queryState: QueryState, query: GraphQuery) {
         val vars = mainRelationParameters(state, queryState, query)
 
         state.emitDecl(
-            mainRelationName(queryState), listOf(IDX_PARAM to NUMBER_TYPE) + vars.values.map { it to NUMBER_TYPE })
+            mainRelationName(queryState),
+            listOf(IDX_PARAM to NUMBER_TYPE) + vars.map { it.value to nodeToParamType(query, it.key) })
         state.emitOutputDecl(mainRelationName(queryState))
 
         val outputParser = SouffleOutputParser(relationToPath(mainRelationName(queryState)))
@@ -393,12 +452,29 @@ class SouffleQueryCompiler(
             outputParser.addSubparser(subparser)
         state.outputs.add(query to outputParser::parse)
 
+        val params = vars.values.toList()
+        for ((vertex, name) in vars.filter { query.isKleeneVertex(it.key)}) {
+            // For Kleene vars only, the "?" prefixed name is the full path, and the non-prefixed name is the last node.
+            // Most queries want the last node.
+            vars[vertex] = name.drop(1)
+        }
+
         state.emitRelation(
-            souffle(mainRelationName(queryState), listOf(AUTOINC) + vars.values) {
+            souffle(mainRelationName(queryState), listOf(AUTOINC) + params) {
                 for (node in vars.keys) {
                     when {
-                        query.isKleeneVertex(node) -> TODO()
-                        query.isSunVertex(node) -> assert(false) { "vars should not contain repeated nodes" }
+                        query.isKleeneVertex(node) -> {
+                            val inKleenes = query.incomingEdgesOf(node).filter { it.isKleene }
+                            assert(inKleenes.size == 1) { "More than one incoming Kleene edge? Huh?"}
+                            val src = query.getEdgeSource(inKleenes[0])
+                            compileKleeneNode(state, queryState, query, src, node)
+                            relation(kleeneRelationName(queryState, node.name)) {
+                                param(vars[src]!!) // source
+                                param("?${vars[node]!!}") // path
+                                param(vars[node]!!) // last element in path
+                            }
+                        }
+                        query.isRepeatedVertex(node) -> assert(false) { "vars should not contain repeated nodes" }
                         else -> nodeRelation(vars[node]!!, nodeRelationName(queryState, node.name))
                     }
                 }
@@ -406,7 +482,7 @@ class SouffleQueryCompiler(
                     val src = query.getEdgeSource(edge)
                     val dst = query.getEdgeTarget(edge)
                     if (src !in vars || dst !in vars) {
-                        assert(query.isSunVertex(src) || query.isSunVertex(dst))
+                        assert(query.isRepeatedVertex(src) || query.isRepeatedVertex(dst))
                         continue
                     }
                     edgeRelation(vars[src]!!, vars[dst]!!, edgeRelationName(queryState, src.name, dst.name))
@@ -478,4 +554,4 @@ fun GraphQuery.isKleeneVertex(v: GraphQueryVertex) = this.incomingEdgesOf(v).any
     (e.mQuery as Metadata).options.any { it is MetadataOption.Kleene }
 }
 
-fun GraphQuery.isSunVertex(v: GraphQueryVertex) = (v.mQuery as Metadata).options.any { it is MetadataOption.Repeated }
+fun GraphQuery.isRepeatedVertex(v: GraphQueryVertex) = (v.mQuery as Metadata).options.any { it is MetadataOption.Repeated }

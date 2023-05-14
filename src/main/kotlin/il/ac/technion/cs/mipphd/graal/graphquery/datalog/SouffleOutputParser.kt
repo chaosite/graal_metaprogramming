@@ -25,7 +25,7 @@ class SouffleOutputParser(private val filename: Path) {
             .asSequence()
             .map { it.flatMap(Pair<Key, List<Pair<GraphQueryVertex, AnalysisNode>>>::second) }
             .map { it.groupBy(Pair<GraphQueryVertex, AnalysisNode>::first) }
-            .map { it.mapValues { it.value.map(Pair<GraphQueryVertex, AnalysisNode>::second) } }
+            .map { it.mapValues { it.value.map(Pair<GraphQueryVertex, AnalysisNode>::second).toSet().toList() } }
             .toList()
 
     private fun parseRaw(graph: AnalysisGraph): List<Pair<Key, List<Pair<GraphQueryVertex, AnalysisNode>>>> {

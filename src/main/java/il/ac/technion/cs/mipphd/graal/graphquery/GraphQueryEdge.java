@@ -1,5 +1,6 @@
 package il.ac.technion.cs.mipphd.graal.graphquery;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import org.jgrapht.graph.DefaultEdge;
 
 public class GraphQueryEdge extends DefaultEdge {
@@ -19,7 +20,8 @@ public class GraphQueryEdge extends DefaultEdge {
         return query.toString();
     }
 
-    public static GraphQueryEdge fromQuery(String query) {
+    @NonNull
+    public static GraphQueryEdge fromQuery(@NonNull String query) {
         return new GraphQueryEdge(MQueryKt.parseMQuery(query));
     }
 
@@ -29,9 +31,11 @@ public class GraphQueryEdge extends DefaultEdge {
 
     public GraphQueryEdge(MQuery mQuery) {
         super();
+
         this.mQuery = mQuery;
     }
 
+    @NonNull
     public GraphQueryEdgeMatchType getMatchType() {
         if (!(mQuery instanceof Metadata))
             throw new RuntimeException("Expected top-level MQuery to be Metadata");
@@ -44,19 +48,24 @@ public class GraphQueryEdge extends DefaultEdge {
         return GraphQueryEdgeMatchType.NORMAL;
     }
 
+    @NonNull
     public MQuery getMQuery() {
         return mQuery;
     }
 
-    public void setMQuery(MQuery mQuery) {
+    public void setMQuery(@NonNull MQuery mQuery) {
+        assert(mQuery instanceof Metadata);
         this.mQuery = mQuery;
     }
 
-    public boolean match(AnalysisNode otherSource, AnalysisEdge otherEdge) {
+    public boolean match(@NonNull AnalysisNode otherSource, @NonNull AnalysisEdge otherEdge) {
         return getMQuery().interpret(new QueryTargetEdge(otherSource, otherEdge));
     }
 
+    @NonNull
     public String label() {
         return mQuery.serialize();
     }
+
+    public boolean isKleene() { return ((Metadata) mQuery).getOptions().contains(MetadataOption.Kleene.INSTANCE); }
 }

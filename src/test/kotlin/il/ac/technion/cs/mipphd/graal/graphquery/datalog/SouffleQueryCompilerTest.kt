@@ -33,10 +33,10 @@ val kleeneQuery = GraphQuery.importQuery("""
 digraph G {
     ifnode [ label="(?P<ifpathnode>)|is('IfNode')" ];
     truepath [ label="(?P<truepath>)|" ];
-    truepath2 [ label="(?P<truepath2>)|" ];
+    truepath2 [ label="(?P<truepath2>)|not is('AbstractMergeNode')" ];
     
     falsepath [ label="(?P<falsepath>)|" ];
-    falsepath2 [ label="(?P<falsepath2>)|" ];
+    falsepath2 [ label="(?P<falsepath2>)|not is('AbstractMergeNode')" ];
     
     merge [ label="(?P<merge>)|" ];
     
@@ -193,6 +193,13 @@ class SouffleQueryCompilerTest {
                     map[y]?.forEach { assertTrue(y.match(it)) }
                     map[arith]?.forEach { assertTrue(arith.match(it)) }
                 }
+            }
+
+            @Test
+            fun `execute kleene query`() {
+                val query = compiler.compile(listOf(kleeneQuery))
+
+                val results = query.execute(graph)
             }
 
             @Test
