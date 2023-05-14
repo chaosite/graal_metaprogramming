@@ -399,10 +399,10 @@ digraph G {
 	values [ label="[](?P<phivalues>)|" ];
     sourcevalues [ label="[](?P<phisourcevalues>)|" ];
 
-	values -> framestate [ label = "is('DATA') and name() = 'values'" ];
+	values -> framestate [ label = "is('ASSOCIATED') and name() = 'values'" ];
     merge -> values [ label = "name() = 'merge'" ];
     sourcevalues -> values [ label = "name() != 'merge'" ];
-	framestate -> merge [ label = "is('DATA') and name() = 'stateAfter'" ];
+	framestate -> merge [ label = "is('ASSOCIATED') and name() = 'stateAfter'" ];
 }
 """
     ) { captureGroups ->
